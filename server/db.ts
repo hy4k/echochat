@@ -128,15 +128,17 @@ export function getLastError() { return _lastError; }
 // Helper to determine if we should use mock or real DB
 const useMock = async () => !(await getDb());
 
-export async function upsertUser(values: InsertUser) {
+export async function upsertUser(values: InsertUser): Promise<User> {
   if (await useMock()) {
     const existing = mockStore.users.findIndex(u => u.openId === values.openId);
     if (existing !== -1) {
       mockStore.users[existing] = { ...mockStore.users[existing], ...values } as User;
+      return mockStore.users[existing];
     } else {
-      mockStore.users.push({ id: mockStore.users.length + 1, createdAt: new Date(), ...values } as User);
+      const newUser = { id: mockStore.users.length + 1, createdAt: new Date(), ...values } as User;
+      mockStore.users.push(newUser);
+      return newUser;
     }
-    return;
   }
   const db = (await getDb())!;
 
@@ -145,9 +147,13 @@ export async function upsertUser(values: InsertUser) {
     if (existing) {
       const updateSet: Partial<InsertUser> = { ...values };
       delete updateSet.openId;
-      await db.update(users).set(updateSet).where(eq(users.openId, values.openId));
+      // @ts-ignore
+      const result = await db.update(users).set(updateSet).where(eq(users.openId, values.openId)).returning();
+      return result[0];
     } else {
-      await db.insert(users).values(values);
+      // @ts-ignore
+      const result = await db.insert(users).values(values).returning();
+      return result[0];
     }
   } catch (error: any) {
     console.error("[Database Error] Upsert failed:", {
@@ -169,6 +175,15 @@ export async function getUserByOpenId(openId: string): Promise<User | undefined>
   return result.length > 0 ? result[0] : undefined;
 }
 
+export async function getAllUsers(): Promise<User[]> {
+  if (await useMock()) {
+    return mockStore.users;
+  }
+  const db = (await getDb())!;
+  // @ts-ignore
+  return await db.select().from(users);
+}
+
 export async function createMessage(data: InsertMessage) {
   if (await useMock()) {
     const msg = { id: mockStore.messages.length + 1, createdAt: new Date(), ...data };
@@ -177,7 +192,7 @@ export async function createMessage(data: InsertMessage) {
   }
   const db = (await getDb())!;
   // @ts-ignore
-  return await db.insert(messages).values(data);
+  return await db.insert(messages).values(data).returning();
 }
 
 export async function getMessagesForUser(userId: number, limit = 50) {
@@ -211,6 +226,16 @@ export async function getOfflineMessages(userId: number) {
     .select()
     .from(offlineMessages)
     .where(and(eq(offlineMessages.receiverId, userId), eq(offlineMessages.viewed, 0)));
+}
+
+export async function markOfflineMessageAsViewed(id: number) {
+  if (await useMock()) {
+    // Mock implementation would go here if needed
+    return;
+  }
+  const db = (await getDb())!;
+  // @ts-ignore
+  await db.update(offlineMessages).set({ viewed: 1 }).where(eq(offlineMessages.id, id));
 }
 
 export async function createKeepsake(data: InsertKeepsake) {

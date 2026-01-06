@@ -21,7 +21,7 @@ export function useAuth(options?: UseAuthOptions) {
     refetchOnWindowFocus: false,
   });
 
-  const guestLoginMutation = trpc.auth.guestLogin.useMutation({
+  const loginMutation = trpc.auth.login.useMutation({
     onSuccess: () => {
       utils.auth.me.refetch();
     }
@@ -36,18 +36,18 @@ export function useAuth(options?: UseAuthOptions) {
     },
   });
 
-  const login = async (userId: number = 1) => {
+  const login = async (username: string) => {
     try {
-      const { token, user } = await guestLoginMutation.mutateAsync({ userId });
+      const { token, user } = await loginMutation.mutateAsync({ username });
       document.cookie = `${COOKIE_NAME}=${token}; path=/; max-age=${60 * 60 * 24 * 365}`;
 
       setMockUser(user);
       localStorage.setItem("echochat-mock-user", JSON.stringify(user));
       await utils.auth.me.refetch();
-      toast.success("Welcome to your sanctuary.");
-    } catch (e) {
+      toast.success(`Welcome home, ${user.name}.`);
+    } catch (e: any) {
       console.error("Login failed", e);
-      toast.error("The sanctuary doors are locked. Please try again.");
+      toast.error(e.message || "The sanctuary doors are locked.");
     }
   };
 

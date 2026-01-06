@@ -85,6 +85,10 @@
       radial-gradient(at 100% 100%, #e6efe9 0%, transparent 60%),
       #fdfaf6;
     background-attachment: fixed;
+    /* Mobile app optimizations */
+    overscroll-behavior-y: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
   }
 
   h1,

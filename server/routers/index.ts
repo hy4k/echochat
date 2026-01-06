@@ -13,23 +13,30 @@ export const appRouter = router({
                 return null;
             }
         }),
-        guestLogin: publicProcedure
-            .input(z.object({ userId: z.number().min(1).max(2).default(1) }))
+        login: publicProcedure
+            .input(z.object({ username: z.string() }))
             .mutation(async ({ input }) => {
-                const openId = `guest-${input.userId}`;
-                const name = input.userId === 1 ? "The One" : "The Other"; // Feature naming
+                const username = input.username.toLowerCase();
+                const allowedUsers = ["mithun", "yashika"];
+
+                if (!allowedUsers.includes(username)) {
+                    throw new Error("Access denied. Invitation only.");
+                }
+
+                const name = username.charAt(0).toUpperCase() + username.slice(1);
+                const openId = username;
 
                 const { sdk } = await import("../_core/sdk");
                 const token = await sdk.createSessionToken(openId, { name });
 
-                await db.upsertUser({
+                const user = await db.upsertUser({
                     openId,
                     name,
                     email: `${openId}@echochat.space`,
                     lastSignedIn: new Date(),
                 });
 
-                return { token, user: { id: input.userId, name, openId } };
+                return { token, user: { id: user.id, name: user.name, openId: user.openId } };
             }),
         logout: publicProcedure.mutation(async ({ ctx }) => {
             return { success: true };
@@ -38,18 +45,67 @@ export const appRouter = router({
     chat: router({
         getMessages: protectedProcedure
             .query(async ({ ctx }) => {
-                // For simplicity in this demo/MVP, we just get all messages for the current user
                 return await db.getMessagesForUser(ctx.user.id);
             }),
+        getOtherUser: protectedProcedure
+            .query(async ({ ctx }) => {
+                // In this two-person sanctuary, the "other user" is whoever is not me.
+                // For guests, it's just swapping 1 and 2, but let's be more dynamic.
+                const allUsers = await db.getAllUsers();
+                return allUsers.find(u => u.id !== ctx.user.id) || null;
+            }),
         sendMessage: protectedProcedure
-            .input(z.object({ receiverId: z.number(), content: z.string() }))
+            .input(z.object({
+                receiverId: z.number().optional(),
+                content: z.string().optional(),
+                mediaUrl: z.string().optional(),
+                messageType: z.enum(["text", "image", "file", "voice", "video"]).optional()
+            }))
             .mutation(async ({ input, ctx }) => {
+                let receiverId = input.receiverId;
+
+                if (!receiverId) {
+                    const allUsers = await db.getAllUsers();
+                    const other = allUsers.find(u => u.id !== ctx.user.id);
+                    if (!other) throw new Error("No partner found in sanctuary.");
+                    receiverId = other.id;
+                }
+
                 return await db.createMessage({
                     senderId: ctx.user.id,
-                    receiverId: input.receiverId,
+                    receiverId: receiverId,
+                    content: input.content || "",  // Content can be empty for images
+                    mediaUrl: input.mediaUrl,
+                    messageType: input.messageType || "text",
+                });
+            }),
+    }),
+    bottle: router({
+        sendBottle: protectedProcedure
+            .input(z.object({ content: z.string() }))
+            .mutation(async ({ input, ctx }) => {
+                const allUsers = await db.getAllUsers();
+                const other = allUsers.find(u => u.id !== ctx.user.id);
+                if (!other) throw new Error("No partner found.");
+
+                return await db.createOfflineMessage({
+                    senderId: ctx.user.id,
+                    receiverId: other.id,
                     content: input.content,
                     messageType: "text",
+                    viewed: 0
                 });
+            }),
+        getBottles: protectedProcedure
+            .query(async ({ ctx }) => {
+                const messages = await db.getOfflineMessages(ctx.user.id);
+                return messages;
+            }),
+        openBottle: protectedProcedure
+            .input(z.object({ id: z.number() }))
+            .mutation(async ({ input }) => {
+                await db.markOfflineMessageAsViewed(input.id);
+                return { success: true };
             }),
     }),
 });

@@ -15,24 +15,22 @@ export default function Landing() {
     }
   }, [isAuthenticated, navigate]);
 
-  const handleEnter = async () => {
-    const params = new URLSearchParams(window.location.search);
-    const userId = params.get("user") === "2" ? 2 : 1;
-    await login(userId);
+  const handleLogin = async (username: string) => {
+    await login(username);
   };
 
   return (
     <div className="min-h-screen w-full relative flex flex-col selection:bg-accent/20">
 
       {/* Refined Header */}
-      <header className="absolute top-0 w-full p-8 md:p-12 z-20 flex justify-between items-center opacity-0 animate-[fadeIn_1s_ease-out_forwards]">
+      <header className="absolute top-0 w-full p-6 z-20 flex justify-between items-center opacity-0 animate-[fadeIn_1s_ease-out_forwards]">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-foreground" />
-          <span className="text-xs font-medium tracking-[0.2em] uppercase text-foreground/80">EchoChat</span>
+          <span className="text-[10px] font-medium tracking-[0.2em] uppercase text-foreground/80">EchoChat</span>
         </div>
-        <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/50 backdrop-blur-md border border-white/50">
-          <Lock className="w-3 h-3 text-foreground/40" />
-          <span className="text-[10px] font-medium tracking-widest uppercase text-foreground/40">Private Encryption</span>
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/50 backdrop-blur-md border border-white/50">
+          <Lock className="w-2.5 h-2.5 text-foreground/40" />
+          <span className="text-[9px] font-medium tracking-widest uppercase text-foreground/40">Private</span>
         </div>
       </header>
 
@@ -45,39 +43,39 @@ export default function Landing() {
           transition={{ duration: 1, ease: "easeOut" }}
           className="text-center max-w-4xl mx-auto space-y-12"
         >
-          <div className="space-y-6">
-            <span className="inline-block py-1 px-3 rounded-full border border-foreground/10 bg-white/30 text-[10px] uppercase tracking-[0.3em] font-medium text-foreground/60">
+          <div className="space-y-4">
+            <span className="inline-block py-1 px-3 rounded-full border border-foreground/10 bg-white/30 text-[9px] uppercase tracking-[0.3em] font-medium text-foreground/60">
               Invitation Only
             </span>
 
-            <h1 className="text-6xl md:text-8xl lg:text-9xl font-serif text-foreground leading-[0.9] tracking-tight">
+            <h1 className="text-6xl font-serif text-foreground leading-[0.95] tracking-tight sm:text-7xl">
               <span className="block italic opacity-60">echo</span>
               <span className="block">chat.space</span>
             </h1>
 
-            <p className="text-lg md:text-xl font-light text-foreground/60 max-w-lg mx-auto leading-relaxed">
-              A permanent digital sanctuary for two. <br className="hidden md:block" />
-              Where silence speaks and memories never fade.
+            <p className="text-base font-light text-foreground/60 max-w-[280px] mx-auto leading-relaxed">
+              A permanent digital sanctuary for two. <br />
+              Where silence speaks and memories stay.
             </p>
           </div>
 
-          <div className="flex flex-col items-center gap-6">
+          <div className="flex flex-col md:flex-row items-center gap-6 w-full max-w-sm mx-auto px-4">
             <Button
-              onClick={handleEnter}
+              onClick={() => handleLogin("mithun")}
               disabled={loading}
-              className="button-premium h-14 px-10 rounded-full text-xs tracking-[0.2em] font-medium bg-foreground text-background hover:bg-foreground/90 transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1"
+              className="w-full button-premium h-14 rounded-full text-xs tracking-[0.2em] font-medium bg-foreground text-background hover:bg-foreground/90 transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1"
             >
-              {loading ? (
-                <div className="flex items-center gap-3">
-                  <div className="w-4 h-4 rounded-full border-2 border-background/30 border-t-background animate-spin" />
-                  <span>Opening...</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-3">
-                  <span>Step Inside</span>
-                  <ArrowRight className="w-4 h-4 opacity-60" />
-                </div>
-              )}
+              {loading ? "Opening..." : "I am Mithun"}
+            </Button>
+
+            <div className="text-[10px] uppercase tracking-[0.2em] text-foreground/30 font-medium">or</div>
+
+            <Button
+              onClick={() => handleLogin("yashika")}
+              disabled={loading}
+              className="w-full button-premium h-14 rounded-full text-xs tracking-[0.2em] font-medium bg-white text-foreground hover:bg-white/90 border border-foreground/5 transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1"
+            >
+              {loading ? "Opening..." : "I am Yashika"}
             </Button>
           </div>
         </motion.div>
@@ -87,7 +85,7 @@ export default function Landing() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.8, duration: 1 }}
-          className="grid grid-cols-3 gap-8 md:gap-24 mt-32 max-w-5xl mx-auto opacity-0 animate-[fadeIn_1s_ease-out_0.8s_forwards]"
+          className="grid grid-cols-3 gap-8 mt-24 max-w-xs mx-auto opacity-0 animate-[fadeIn_1s_ease-out_0.8s_forwards]"
         >
           <FeatureItem icon={<Heart className="w-5 h-5" />} label="Text" delay={0.9} />
           <FeatureItem icon={<Sun className="w-5 h-5" />} label="Voice" delay={1.0} />
