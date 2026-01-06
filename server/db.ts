@@ -49,6 +49,13 @@ export async function bootstrapDb() {
         "lastSignedIn" TIMESTAMPTZ DEFAULT NOW() NOT NULL
       );
     `);
+
+    // Verify the constraint actually exists
+    const check = await client.unsafe(`
+      SELECT conname FROM pg_constraint WHERE conname = 'users_openId_key' OR conname = 'users_openId_unique';
+    `);
+
+    console.log("[Database] Constraint check result:", check);
     console.log("[Database] Deep bootstrap completed successfully.");
   } catch (err: any) {
     console.error("[Database] Deep bootstrap failed:", {

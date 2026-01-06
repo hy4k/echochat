@@ -26,6 +26,19 @@ if (process.env.NODE_ENV === "production") {
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 
+// Health check and diagnostics
+app.get("/api/health", (_req, res) => res.json({ status: "ok", time: new Date().toISOString() }));
+app.get("/api", (_req, res) => res.json({ message: "EchoChat API is online", version: "1.0.0" }));
+app.get("/api/debug", async (_req, res) => {
+    const { getDb } = await import("../db");
+    const dbExists = !!(await getDb());
+    res.json({
+        env: process.env.NODE_ENV,
+        dbConnected: dbExists,
+        timestamp: new Date().toISOString()
+    });
+});
+
 app.use(
     "/api/trpc",
     createExpressMiddleware({
