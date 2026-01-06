@@ -526,7 +526,9 @@ export default function Chat() {
               <Heart className="w-6 h-6 text-accent fill-accent" />
             </motion.div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight mb-1 text-foreground">Whisper Stream</h1>
+              <h1 className="text-xl font-bold tracking-tight mb-1 text-foreground">
+                {user?.name ? `${user.name}'s Horizon` : "Whisper Stream"}
+              </h1>
               <div className="flex items-center gap-2">
                 <motion.span
                   animate={{ opacity: [0.5, 1, 0.5] }}

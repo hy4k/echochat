@@ -39,11 +39,16 @@ export function useAuth(options?: UseAuthOptions) {
   const login = async (username: string) => {
     try {
       const { token, user } = await loginMutation.mutateAsync({ username });
-      document.cookie = `${COOKIE_NAME}=${token}; path=/; max-age=${60 * 60 * 24 * 365}`;
+
+      // Set cookie with broad compatibility
+      document.cookie = `${COOKIE_NAME}=${token}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
 
       setMockUser(user);
       localStorage.setItem("echochat-mock-user", JSON.stringify(user));
+
+      await utils.auth.me.invalidate(); // Force invalidate to trigger fresh fetch
       await utils.auth.me.refetch();
+
       toast.success(`Welcome home, ${user.name}.`);
     } catch (e: any) {
       console.error("Login failed", e);
