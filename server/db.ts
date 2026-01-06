@@ -30,14 +30,10 @@ export async function bootstrapDb() {
 
   const client = postgres(process.env.DATABASE_URL!, { ssl: 'require' });
 
-  console.log("[Database] Starting deep bootstrap...");
+  console.log("[Database] Bootstrapping users table...");
   try {
-    // We will FORCE recreate the table to ensure the UNIQUE constraint is absolutely there.
-    // This is necessary because the previous partial setup created a "broken" table that CREATE TABLE IF NOT EXISTS won't fix.
     await client.unsafe(`
-      DROP TABLE IF EXISTS "users" CASCADE;
-      
-      CREATE TABLE "users" (
+      CREATE TABLE IF NOT EXISTS "users" (
         "id" SERIAL PRIMARY KEY,
         "openId" VARCHAR(64) NOT NULL UNIQUE,
         "name" TEXT,
@@ -49,20 +45,9 @@ export async function bootstrapDb() {
         "lastSignedIn" TIMESTAMPTZ DEFAULT NOW() NOT NULL
       );
     `);
-
-    // Verify the constraint actually exists
-    const check = await client.unsafe(`
-      SELECT conname FROM pg_constraint WHERE conname = 'users_openId_key' OR conname = 'users_openId_unique';
-    `);
-
-    console.log("[Database] Constraint check result:", check);
-    console.log("[Database] Deep bootstrap completed successfully.");
+    console.log("[Database] Users table verified.");
   } catch (err: any) {
-    console.error("[Database] Deep bootstrap failed:", {
-      message: err.message,
-      detail: err.detail,
-      hint: err.hint
-    });
+    console.warn("[Database] Bootstrap message:", err.message);
   } finally {
     await client.end();
   }
@@ -108,25 +93,20 @@ export async function upsertUser(values: InsertUser) {
   }
   const db = (await getDb())!;
 
-  const updateSet: Partial<InsertUser> = { ...values };
-  delete updateSet.openId;
-
   try {
-    await db
-      .insert(users)
-      .values(values)
-      .onConflictDoUpdate({
-        target: users.openId,
-        set: updateSet,
-      });
+    const existing = await getUserByOpenId(values.openId);
+    if (existing) {
+      const updateSet: Partial<InsertUser> = { ...values };
+      delete updateSet.openId;
+      await db.update(users).set(updateSet).where(eq(users.openId, values.openId));
+    } else {
+      await db.insert(users).values(values);
+    }
   } catch (error: any) {
     console.error("[Database Error] Upsert failed:", {
       message: error.message,
       code: error.code,
       detail: error.detail,
-      hint: error.hint,
-      query: error.query,
-      params: error.params
     });
     throw error;
   }

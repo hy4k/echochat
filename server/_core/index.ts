@@ -20,12 +20,10 @@ console.log("[Server] process started, initializing...");
 const app = express();
 const httpServer = createServer(app);
 
-// Bootstrap Database in production (non-blocking)
+// Bootstrap Database in production
 if (process.env.NODE_ENV === "production") {
-    console.log("[Server] Production mode detected, triggering bootstrap...");
-    bootstrapDb().catch(err => {
-        console.error("[Database] Background bootstrap failed:", err);
-    });
+    console.log("[Server] Production mode detected, bootstrapping database...");
+    await bootstrapDb();
 }
 
 app.use(cors({ origin: true, credentials: true }));
