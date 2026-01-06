@@ -1,11 +1,11 @@
 import express from "express";
 import { createServer } from "http";
-import crypto from "node:crypto";
+import { webcrypto } from "node:crypto";
 
 // Polyfill crypto for older Node.js versions or environments where it's not global
 if (!globalThis.crypto) {
     // @ts-ignore
-    globalThis.crypto = crypto;
+    globalThis.crypto = webcrypto;
 }
 
 import { setupVite, serveStatic } from "./vite";
