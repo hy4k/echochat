@@ -29,15 +29,17 @@ export async function bootstrapDb() {
   if (process.env.NODE_ENV !== "production") return;
 
   const client = postgres(process.env.DATABASE_URL!, { ssl: 'require' });
-  const db = drizzle(client);
 
-  console.log("[Database] Bootstrapping schema...");
+  console.log("[Database] Starting deep bootstrap...");
   try {
-    // 1. Create table if not exists
+    // We will FORCE recreate the table to ensure the UNIQUE constraint is absolutely there.
+    // This is necessary because the previous partial setup created a "broken" table that CREATE TABLE IF NOT EXISTS won't fix.
     await client.unsafe(`
-      CREATE TABLE IF NOT EXISTS "users" (
+      DROP TABLE IF EXISTS "users" CASCADE;
+      
+      CREATE TABLE "users" (
         "id" SERIAL PRIMARY KEY,
-        "openId" VARCHAR(64) NOT NULL,
+        "openId" VARCHAR(64) NOT NULL UNIQUE,
         "name" TEXT,
         "email" VARCHAR(320),
         "loginMethod" VARCHAR(64),
@@ -47,26 +49,12 @@ export async function bootstrapDb() {
         "lastSignedIn" TIMESTAMPTZ DEFAULT NOW() NOT NULL
       );
     `);
-
-    // 2. Surgical repair: Ensure unique constraint exists even if table existed before
-    await client.unsafe(`
-      DO $$ 
-      BEGIN 
-        BEGIN
-          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'users_openId_unique') THEN
-            ALTER TABLE "users" ADD CONSTRAINT "users_openId_unique" UNIQUE ("openId");
-          END IF;
-        EXCEPTION WHEN OTHERS THEN
-          RAISE NOTICE 'Constraint might already exist or table is in a different state';
-        END;
-      END $$;
-    `);
-    console.log("[Database] Schema boostrapped successfully.");
+    console.log("[Database] Deep bootstrap completed successfully.");
   } catch (err: any) {
-    console.error("[Database] Bootstrap failed deeply:", {
+    console.error("[Database] Deep bootstrap failed:", {
       message: err.message,
       detail: err.detail,
-      query: err.query
+      hint: err.hint
     });
   } finally {
     await client.end();
