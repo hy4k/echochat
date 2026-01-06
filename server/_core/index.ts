@@ -22,8 +22,8 @@ const httpServer = createServer(app);
 
 // Bootstrap Database in production
 if (process.env.NODE_ENV === "production") {
-    console.log("[Server] Production mode detected, bootstrapping database...");
-    await bootstrapDb();
+    console.log("[Server] Production mode detected, bootstrapping database (non-blocking)...");
+    bootstrapDb().catch(err => console.error("[Server] Critical bootstrap error:", err));
 }
 
 app.use(cors({ origin: true, credentials: true }));
