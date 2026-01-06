@@ -64,19 +64,44 @@ const mockStore = {
   horizon: new Map<number, any>(),
 };
 
+let _lastError: string | null = null;
+
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL && !process.env.DATABASE_URL.includes("[YOUR-PASSWORD]")) {
     try {
-      _client = postgres(process.env.DATABASE_URL, { ssl: 'require' });
+      console.log("[Database] Attempting connection to Supabase...");
+      // Try with SSL first
+      _client = postgres(process.env.DATABASE_URL, {
+        ssl: 'require',
+        connect_timeout: 10,
+        max: 1 // Keep connections low for free tier
+      });
       _db = drizzle(_client);
+
+      // Test the connection immediately
+      await _client.unsafe('SELECT 1');
       console.log("[Database] Connected to PostgreSQL (SSL)");
-    } catch (error) {
-      console.warn("[Database] Failed to connect, falling back to mock storage.");
-      _db = null;
+      _lastError = null;
+    } catch (error: any) {
+      console.warn("[Database] SSL connection failed, trying simplified connection...", error.message);
+      try {
+        if (_client) await _client.end();
+        _client = postgres(process.env.DATABASE_URL, { connect_timeout: 10, max: 1 });
+        _db = drizzle(_client);
+        await _client.unsafe('SELECT 1');
+        console.log("[Database] Connected to PostgreSQL (Non-SSL)");
+        _lastError = null;
+      } catch (innerError: any) {
+        _lastError = innerError.message;
+        console.error("[Database] Total connection failure:", _lastError);
+        _db = null;
+      }
     }
   }
   return _db;
 }
+
+export function getLastError() { return _lastError; }
 
 // Helper to determine if we should use mock or real DB
 const useMock = async () => !(await getDb());

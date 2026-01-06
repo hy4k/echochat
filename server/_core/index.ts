@@ -33,11 +33,12 @@ app.use(express.json());
 app.get("/api/health", (_req, res) => res.json({ status: "ok", time: new Date().toISOString() }));
 app.get("/api", (_req, res) => res.json({ message: "EchoChat API is online", version: "1.0.0" }));
 app.get("/api/debug", async (_req, res) => {
-    const { getDb } = await import("../db");
+    const { getDb, getLastError } = await import("../db");
     const dbExists = !!(await getDb());
     res.json({
         env: process.env.NODE_ENV,
         dbConnected: dbExists,
+        dbError: getLastError(),
         timestamp: new Date().toISOString()
     });
 });
