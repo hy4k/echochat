@@ -34,11 +34,24 @@ app.get("/api/health", (_req, res) => res.json({ status: "ok", time: new Date().
 app.get("/api", (_req, res) => res.json({ message: "EchoChat API is online", version: "1.0.0" }));
 app.get("/api/debug", async (_req, res) => {
     const { getDb, getLastError } = await import("../db");
-    const dbExists = !!(await getDb());
+    const db = await getDb();
+    let tables: any[] = [];
+    if (db) {
+        try {
+            // @ts-ignore - access inner client to run raw query
+            const result = await db.session.client.unsafe(`
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_schema = 'public'
+            `);
+            tables = result.map((t: any) => t.table_name);
+        } catch (e) { }
+    }
     res.json({
         env: process.env.NODE_ENV,
-        dbConnected: dbExists,
+        dbConnected: !!db,
         dbError: getLastError(),
+        tables,
         timestamp: new Date().toISOString()
     });
 });
