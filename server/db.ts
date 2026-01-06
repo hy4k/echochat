@@ -1,229 +1,297 @@
-import { and, desc, eq, or } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, messages, InsertMessage, offlineMessages, InsertOfflineMessage, keepsakes, InsertKeepsake, userPresence, InsertUserPresence, sharedHorizon, InsertSharedHorizon } from "../drizzle/schema";
-import { ENV } from './_core/env';
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+import { eq, or, and, desc, sql } from "drizzle-orm";
+import {
+  users,
+  messages,
+  offlineMessages,
+  keepsakes,
+  userPresence,
+  sharedHorizon,
+  type User,
+  type InsertUser,
+  type Message,
+  type InsertMessage,
+  type OfflineMessage,
+  type InsertOfflineMessage,
+  type Keepsake,
+  type InsertKeepsake,
+  type UserPresence,
+  type InsertUserPresence,
+  type SharedHorizon,
+  type InsertSharedHorizon,
+} from "../drizzle/schema";
 
 let _db: ReturnType<typeof drizzle> | null = null;
+let _client: any = null;
 
-// Lazily create the drizzle instance so local tooling can run without a DB.
+// In-memory mock storage for development when DB is unavailable
+const mockStore = {
+  users: [
+    { id: 1, openId: "dev-user", name: "Echo Partner", email: "dev@echochat.space", createdAt: new Date(), lastSignedIn: new Date(), role: "user" }
+  ] as User[],
+  messages: [] as any[],
+  keepsakes: [] as any[],
+  presence: new Map<number, any>(),
+  horizon: new Map<number, any>(),
+};
+
 export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
+  if (!_db && process.env.DATABASE_URL && !process.env.DATABASE_URL.includes("[YOUR-PASSWORD]")) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      _client = postgres(process.env.DATABASE_URL);
+      _db = drizzle(_client);
+      console.log("[Database] Connected to PostgreSQL");
     } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
+      console.warn("[Database] Failed to connect, falling back to mock storage.");
       _db = null;
     }
   }
   return _db;
 }
 
-export async function upsertUser(user: InsertUser): Promise<void> {
-  if (!user.openId) {
-    throw new Error("User openId is required for upsert");
-  }
+// Helper to determine if we should use mock or real DB
+const useMock = async () => !(await getDb());
 
-  const db = await getDb();
-  if (!db) {
-    console.warn("[Database] Cannot upsert user: database not available");
+export async function upsertUser(values: InsertUser) {
+  if (await useMock()) {
+    const existing = mockStore.users.findIndex(u => u.openId === values.openId);
+    if (existing !== -1) {
+      mockStore.users[existing] = { ...mockStore.users[existing], ...values } as User;
+    } else {
+      mockStore.users.push({ id: mockStore.users.length + 1, createdAt: new Date(), ...values } as User);
+    }
     return;
   }
+  const db = (await getDb())!;
 
-  try {
-    const values: InsertUser = {
-      openId: user.openId,
-    };
-    const updateSet: Record<string, unknown> = {};
+  const updateSet: Partial<InsertUser> = { ...values };
+  delete updateSet.openId;
 
-    const textFields = ["name", "email", "loginMethod"] as const;
-    type TextField = (typeof textFields)[number];
-
-    const assignNullable = (field: TextField) => {
-      const value = user[field];
-      if (value === undefined) return;
-      const normalized = value ?? null;
-      values[field] = normalized;
-      updateSet[field] = normalized;
-    };
-
-    textFields.forEach(assignNullable);
-
-    if (user.lastSignedIn !== undefined) {
-      values.lastSignedIn = user.lastSignedIn;
-      updateSet.lastSignedIn = user.lastSignedIn;
-    }
-    if (user.role !== undefined) {
-      values.role = user.role;
-      updateSet.role = user.role;
-    } else if (user.openId === ENV.ownerOpenId) {
-      values.role = 'admin';
-      updateSet.role = 'admin';
-    }
-
-    if (!values.lastSignedIn) {
-      values.lastSignedIn = new Date();
-    }
-
-    if (Object.keys(updateSet).length === 0) {
-      updateSet.lastSignedIn = new Date();
-    }
-
-    await db.insert(users).values(values).onDuplicateKeyUpdate({
+  await db
+    .insert(users)
+    .values(values)
+    .onConflictDoUpdate({
+      target: users.openId,
       set: updateSet,
     });
-  } catch (error) {
-    console.error("[Database] Failed to upsert user:", error);
-    throw error;
-  }
 }
 
-export async function getUserByOpenId(openId: string) {
-  const db = await getDb();
-  if (!db) {
-    console.warn("[Database] Cannot get user: database not available");
-    return undefined;
+export async function getUserByOpenId(openId: string): Promise<User | undefined> {
+  if (await useMock()) {
+    return mockStore.users.find(u => u.openId === openId);
   }
-
+  const db = (await getDb())!;
+  // @ts-ignore
   const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
-
   return result.length > 0 ? result[0] : undefined;
 }
 
-// Message queries
 export async function createMessage(data: InsertMessage) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  const result = await db.insert(messages).values(data);
-  return result;
+  if (await useMock()) {
+    const msg = { id: mockStore.messages.length + 1, createdAt: new Date(), ...data };
+    mockStore.messages.push(msg);
+    return [msg];
+  }
+  const db = (await getDb())!;
+  // @ts-ignore
+  return await db.insert(messages).values(data);
 }
 
-export async function getMessagesBetweenUsers(userId1: number, userId2: number, limit = 50, offset = 0) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  const result = await db
+export async function getMessagesForUser(userId: number, limit = 50) {
+  if (await useMock()) {
+    return mockStore.messages
+      .filter(m => m.senderId === userId || m.receiverId === userId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .slice(0, limit);
+  }
+  const db = (await getDb())!;
+  // @ts-ignore
+  return await db
     .select()
     .from(messages)
-    .where(
-      or(
-        and(eq(messages.senderId, userId1), eq(messages.receiverId, userId2)),
-        and(eq(messages.senderId, userId2), eq(messages.receiverId, userId1))
-      )
-    )
+    .where(or(eq(messages.senderId, userId), eq(messages.receiverId, userId)))
+    // @ts-ignore
     .orderBy(desc(messages.createdAt))
-    .limit(limit)
-    .offset(offset);
-  return result.reverse();
+    .limit(limit);
 }
 
-export async function updateMessageStatus(messageId: number, status: "sent" | "delivered" | "read") {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  await db.update(messages).set({ status }).where(eq(messages.id, messageId));
-}
-
-// Offline message queries
 export async function createOfflineMessage(data: InsertOfflineMessage) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  const result = await db.insert(offlineMessages).values(data);
-  return result;
+  const db = (await getDb())!;
+  // @ts-ignore
+  return await db.insert(offlineMessages).values(data);
 }
 
-export async function getOfflineMessagesForUser(userId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  const result = await db
+export async function getOfflineMessages(userId: number) {
+  const db = (await getDb())!;
+  // @ts-ignore
+  return await db
     .select()
     .from(offlineMessages)
-    .where(eq(offlineMessages.receiverId, userId))
-    .orderBy(desc(offlineMessages.createdAt));
-  return result;
+    .where(and(eq(offlineMessages.receiverId, userId), eq(offlineMessages.viewed, 0)));
 }
 
-export async function markOfflineMessageAsViewed(messageId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  await db.update(offlineMessages).set({ viewed: 1 }).where(eq(offlineMessages.id, messageId));
-}
-
-// Keepsake queries
 export async function createKeepsake(data: InsertKeepsake) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  const result = await db.insert(keepsakes).values(data);
-  return result;
+  if (await useMock()) {
+    const k = { id: mockStore.keepsakes.length + 1, pinnedAt: new Date(), createdAt: new Date(), ...data };
+    mockStore.keepsakes.push(k);
+    return [k];
+  }
+  const db = (await getDb())!;
+  // @ts-ignore
+  return await db.insert(keepsakes).values(data);
 }
 
 export async function getKeepsakesBetweenUsers(userId1: number, userId2: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  const result = await db
+  if (await useMock()) {
+    return mockStore.keepsakes
+      .filter(k => k.userId === userId1 || k.userId === userId2)
+      .sort((a, b) => b.pinnedAt.getTime() - a.pinnedAt.getTime());
+  }
+  const db = (await getDb())!;
+  // @ts-ignore
+  return await db
     .select()
     .from(keepsakes)
     .where(or(eq(keepsakes.userId, userId1), eq(keepsakes.userId, userId2)))
+    // @ts-ignore
     .orderBy(desc(keepsakes.pinnedAt));
-  return result;
 }
 
-export async function deleteKeepsake(keepsakeId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  await db.delete(keepsakes).where(eq(keepsakes.id, keepsakeId));
+export async function getKeepsakesForUser(userId: number) {
+  if (await useMock()) {
+    return mockStore.keepsakes
+      .filter(k => k.userId === userId)
+      .sort((a, b) => b.pinnedAt.getTime() - a.pinnedAt.getTime());
+  }
+  const db = (await getDb())!;
+  // @ts-ignore
+  return await db.select().from(keepsakes).where(eq(keepsakes.userId, userId)).orderBy(desc(keepsakes.pinnedAt));
 }
 
-// User presence queries
-export async function updateUserPresence(userId: number, isOnline: boolean, latitude?: string, longitude?: string, timezone?: string) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  const data: any = { isOnline: isOnline ? 1 : 0, lastSeenAt: new Date() };
-  if (latitude) data.latitude = latitude;
-  if (longitude) data.longitude = longitude;
-  if (timezone) data.timezone = timezone;
-  
-  await db.insert(userPresence).values({ userId, ...data }).onDuplicateKeyUpdate({
+export async function updatePresence(userId: number, data: Partial<InsertUserPresence>) {
+  if (await useMock()) {
+    mockStore.presence.set(userId, { userId, ...data, updatedAt: new Date() });
+    return;
+  }
+  const db = (await getDb())!;
+  // @ts-ignore
+  await db.insert(userPresence).values({ userId, ...data }).onConflictDoUpdate({
+    // @ts-ignore
+    target: userPresence.userId,
     set: data,
   });
 }
 
 export async function getUserPresence(userId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (await useMock()) {
+    return mockStore.presence.get(userId) || null;
+  }
+  const db = (await getDb())!;
+  // @ts-ignore
   const result = await db.select().from(userPresence).where(eq(userPresence.userId, userId)).limit(1);
   return result.length > 0 ? result[0] : null;
 }
 
-export async function getBothUsersPresence(userId1: number, userId2: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  const results = await db.select().from(userPresence).where(or(eq(userPresence.userId, userId1), eq(userPresence.userId, userId2)));
-  return results;
-}
-
-// Shared Horizon queries
-export async function updateSharedHorizon(data: InsertSharedHorizon) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  await db.insert(sharedHorizon).values(data).onDuplicateKeyUpdate({
-    set: {
-      weatherCondition: data.weatherCondition,
-      temperature: data.temperature,
-      timeOfDay: data.timeOfDay,
-      backgroundColor: data.backgroundColor,
-      accentColor: data.accentColor,
-    },
+export async function updateSharedHorizon(userId: number, data: Partial<InsertSharedHorizon>) {
+  if (await useMock()) {
+    mockStore.horizon.set(userId, { userId, ...data, updatedAt: new Date() });
+    return;
+  }
+  const db = (await getDb())!;
+  // @ts-ignore
+  await db.insert(sharedHorizon).values({ userId, ...data }).onConflictDoUpdate({
+    // @ts-ignore
+    target: sharedHorizon.userId,
+    set: data as any,
   });
 }
 
 export async function getSharedHorizonForUser(userId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (await useMock()) {
+    return mockStore.horizon.get(userId) || {
+      userId,
+      weatherCondition: "Clear",
+      temperature: "22°C",
+      timeOfDay: "Morning",
+      backgroundColor: "#1a1a2e",
+      accentColor: "#ebcfc4",
+    };
+  }
+  const db = (await getDb())!;
+  // @ts-ignore
   const result = await db.select().from(sharedHorizon).where(eq(sharedHorizon.userId, userId)).limit(1);
   return result.length > 0 ? result[0] : null;
 }
 
-export async function getBothUsersSharedHorizon(userId1: number, userId2: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  const results = await db.select().from(sharedHorizon).where(or(eq(sharedHorizon.userId, userId1), eq(sharedHorizon.userId, userId2)));
-  return results;
+export async function getMessageStats(userId: number) {
+  if (await useMock()) {
+    const userMessages = mockStore.messages.filter(m => m.senderId === userId || m.receiverId === userId);
+    return {
+      sent: mockStore.messages.filter(m => m.senderId === userId).length,
+      received: mockStore.messages.filter(m => m.receiverId === userId).length,
+      keepsakes: mockStore.keepsakes.filter(k => k.userId === userId).length,
+      lastMessageAt: userMessages.length > 0 ? userMessages.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0].createdAt : null,
+    };
+  }
+  const db = (await getDb())!;
+
+  // @ts-ignore
+  const totalSent = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(messages)
+    // @ts-ignore
+    .where(eq(messages.senderId, userId));
+
+  // @ts-ignore
+  const totalReceived = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(messages)
+    // @ts-ignore
+    .where(eq(messages.receiverId, userId));
+
+  // @ts-ignore
+  const totalKeepsakes = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(keepsakes)
+    // @ts-ignore
+    .where(eq(keepsakes.userId, userId));
+
+  // @ts-ignore
+  const lastMessage = await db
+    .select()
+    .from(messages)
+    // @ts-ignore
+    .where(or(eq(messages.senderId, userId), eq(messages.receiverId, userId)))
+    // @ts-ignore
+    .orderBy(desc(messages.createdAt))
+    .limit(1);
+
+  return {
+    sent: Number(totalSent[0]?.count || 0),
+    received: Number(totalReceived[0]?.count || 0),
+    keepsakes: Number(totalKeepsakes[0]?.count || 0),
+    lastMessageAt: lastMessage[0]?.createdAt || null,
+  };
+}
+
+export async function getDailyActivity(userId: number) {
+  if (await useMock()) {
+    return [{ date: new Date().toISOString().split('T')[0], count: mockStore.messages.length }];
+  }
+  const db = (await getDb())!;
+
+  // Get message counts per day for the last 7 days
+  const result = await db.execute(sql`
+    SELECT 
+      DATE(createdAt AT TIME ZONE 'UTC') as date,
+      COUNT(*) as count
+    FROM messages
+    WHERE (senderId = ${userId} OR receiverId = ${userId})
+      AND createdAt > NOW() - INTERVAL '7 days'
+    GROUP BY DATE(createdAt AT TIME ZONE 'UTC')
+    ORDER BY date ASC
+  `);
+
+  return result as unknown as { date: string; count: number }[];
 }

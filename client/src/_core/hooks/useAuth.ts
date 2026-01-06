@@ -1,7 +1,9 @@
+import { COOKIE_NAME } from "@shared/const";
 import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { TRPCClientError } from "@trpc/client";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 
 type UseAuthOptions = {
   redirectOnUnauthenticated?: boolean;
@@ -12,73 +14,87 @@ export function useAuth(options?: UseAuthOptions) {
   const { redirectOnUnauthenticated = false, redirectPath = getLoginUrl() } =
     options ?? {};
   const utils = trpc.useUtils();
+  const [mockUser, setMockUser] = useState<any>(null);
 
   const meQuery = trpc.auth.me.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
   });
 
+  const guestLoginMutation = trpc.auth.guestLogin.useMutation({
+    onSuccess: () => {
+      utils.auth.me.refetch();
+    }
+  });
+
   const logoutMutation = trpc.auth.logout.useMutation({
     onSuccess: () => {
       utils.auth.me.setData(undefined, null);
+      setMockUser(null);
+      localStorage.removeItem("echochat-mock-user");
+      document.cookie = `${COOKIE_NAME}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
     },
   });
+
+  const login = async (userId: number = 1) => {
+    try {
+      const { token, user } = await guestLoginMutation.mutateAsync({ userId });
+      document.cookie = `${COOKIE_NAME}=${token}; path=/; max-age=${60 * 60 * 24 * 365}`;
+
+      setMockUser(user);
+      localStorage.setItem("echochat-mock-user", JSON.stringify(user));
+      await utils.auth.me.refetch();
+      toast.success("Welcome to your sanctuary.");
+    } catch (e) {
+      console.error("Login failed", e);
+      toast.error("The sanctuary doors are locked. Please try again.");
+    }
+  };
+
+  useEffect(() => {
+    const saved = localStorage.getItem("echochat-mock-user");
+    if (saved && !meQuery.isLoading && !meQuery.data && meQuery.isError) {
+      // Server says we are not logged in, but local storage says we are.
+      // We should probably trust the server and clear local storage.
+      localStorage.removeItem("echochat-mock-user");
+      setMockUser(null);
+    } else if (saved && !mockUser) {
+      try {
+        setMockUser(JSON.parse(saved));
+      } catch (e) { }
+    }
+  }, [meQuery.data, meQuery.isLoading, meQuery.isError, mockUser]);
 
   const logout = useCallback(async () => {
     try {
       await logoutMutation.mutateAsync();
     } catch (error: unknown) {
-      if (
-        error instanceof TRPCClientError &&
-        error.data?.code === "UNAUTHORIZED"
-      ) {
-        return;
-      }
-      throw error;
+      // ignore
     } finally {
       utils.auth.me.setData(undefined, null);
-      await utils.auth.me.invalidate();
+      setMockUser(null);
+      localStorage.removeItem("echochat-mock-user");
+      document.cookie = `${COOKIE_NAME}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
     }
   }, [logoutMutation, utils]);
 
   const state = useMemo(() => {
-    localStorage.setItem(
-      "manus-runtime-user-info",
-      JSON.stringify(meQuery.data)
-    );
+    // If we have meQuery data, use it. 
+    // If not, and we are in dev, use mockUser for a faster/more stable transition.
+    const user = meQuery.data || (import.meta.env.DEV ? mockUser : null);
+
     return {
-      user: meQuery.data ?? null,
-      loading: meQuery.isLoading || logoutMutation.isPending,
-      error: meQuery.error ?? logoutMutation.error ?? null,
-      isAuthenticated: Boolean(meQuery.data),
+      user,
+      loading: meQuery.isLoading && !mockUser, // Don't show global loading if we have a mock fallback
+      error: meQuery.error,
+      isAuthenticated: Boolean(user),
     };
-  }, [
-    meQuery.data,
-    meQuery.error,
-    meQuery.isLoading,
-    logoutMutation.error,
-    logoutMutation.isPending,
-  ]);
-
-  useEffect(() => {
-    if (!redirectOnUnauthenticated) return;
-    if (meQuery.isLoading || logoutMutation.isPending) return;
-    if (state.user) return;
-    if (typeof window === "undefined") return;
-    if (window.location.pathname === redirectPath) return;
-
-    window.location.href = redirectPath
-  }, [
-    redirectOnUnauthenticated,
-    redirectPath,
-    logoutMutation.isPending,
-    meQuery.isLoading,
-    state.user,
-  ]);
+  }, [mockUser, meQuery.data, meQuery.isLoading, meQuery.error]);
 
   return {
     ...state,
     refresh: () => meQuery.refetch(),
     logout,
+    login,
   };
 }

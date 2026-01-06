@@ -38,6 +38,9 @@ export default defineConfig({
     ],
     fs: {
       strict: true,
+      allow: [
+        path.resolve(import.meta.dirname),
+      ],
       deny: ["**/.*"],
     },
   },

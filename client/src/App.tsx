@@ -6,8 +6,6 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Landing from "./pages/Landing";
 import Chat from "./pages/Chat";
-import Keepsakes from "./pages/Keepsakes";
-import SharedHorizon from "./pages/SharedHorizon";
 import { useAuth } from "./_core/hooks/useAuth";
 
 function Router() {
@@ -26,10 +24,12 @@ function Router() {
 
   return (
     <Switch>
-      <Route path="/" component={isAuthenticated ? Chat : Landing} />
-      <Route path="/chat" component={Chat} />
-      <Route path="/keepsakes" component={Keepsakes} />
-      <Route path="/horizon" component={SharedHorizon} />
+      <Route path="/">
+        {isAuthenticated ? <Chat /> : <Landing />}
+      </Route>
+      <Route path="/chat">
+        {isAuthenticated ? <Chat /> : <Landing />}
+      </Route>
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

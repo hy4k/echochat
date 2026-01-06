@@ -1,65 +1,77 @@
-import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
-import net from "net";
+import { setupVite, serveStatic } from "./vite";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { registerOAuthRoutes } from "./oauth";
-import { appRouter } from "../routers";
-import { createContext } from "./context";
-import { serveStatic, setupVite } from "./vite";
+import { appRouter } from "../routers/index";
+import cors from "cors";
+import "dotenv/config";
 
-function isPortAvailable(port: number): Promise<boolean> {
-  return new Promise(resolve => {
-    const server = net.createServer();
-    server.listen(port, () => {
-      server.close(() => resolve(true));
-    });
-    server.on("error", () => resolve(false));
-  });
-}
+const app = express();
+const httpServer = createServer(app);
 
-async function findAvailablePort(startPort: number = 3000): Promise<number> {
-  for (let port = startPort; port < startPort + 20; port++) {
-    if (await isPortAvailable(port)) {
-      return port;
-    }
-  }
-  throw new Error(`No available port found starting from ${startPort}`);
-}
+app.use(cors({ origin: true, credentials: true }));
+app.use(express.json());
 
-async function startServer() {
-  const app = express();
-  const server = createServer(app);
-  // Configure body parser with larger size limit for file uploads
-  app.use(express.json({ limit: "50mb" }));
-  app.use(express.urlencoded({ limit: "50mb", extended: true }));
-  // OAuth callback under /api/oauth/callback
-  registerOAuthRoutes(app);
-  // tRPC API
-  app.use(
+app.use(
     "/api/trpc",
     createExpressMiddleware({
-      router: appRouter,
-      createContext,
+        router: appRouter,
+        createContext: async ({ req }) => {
+            try {
+                const { sdk } = await import("./sdk");
+                const user = await sdk.authenticateRequest(req);
+                return { req, user };
+            } catch (e) {
+                return { req, user: null };
+            }
+        },
     })
-  );
-  // development mode uses Vite, production mode uses static files
-  if (process.env.NODE_ENV === "development") {
-    await setupVite(app, server);
-  } else {
+);
+
+if (process.env.NODE_ENV !== "production") {
+    await setupVite(app, httpServer);
+} else {
     serveStatic(app);
-  }
-
-  const preferredPort = parseInt(process.env.PORT || "3000");
-  const port = await findAvailablePort(preferredPort);
-
-  if (port !== preferredPort) {
-    console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
-  }
-
-  server.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}/`);
-  });
 }
 
-startServer().catch(console.error);
+const PORT = Number(process.env.PORT || 3003);
+
+import { Server } from "socket.io";
+
+const io = new Server(httpServer, {
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"]
+    }
+});
+
+io.on("connection", (socket) => {
+    console.log("User connected:", socket.id);
+
+    socket.on("join-room", (roomId) => {
+        socket.join(roomId);
+        console.log(`User ${socket.id} joined room ${roomId}`);
+        // Notify others in room
+        socket.to(roomId).emit("user-connected", socket.id);
+    });
+
+    socket.on("offer", (payload) => {
+        socket.to(payload.roomId).emit("offer", payload);
+    });
+
+    socket.on("answer", (payload) => {
+        socket.to(payload.roomId).emit("answer", payload);
+    });
+
+    socket.on("ice-candidate", (payload) => {
+        socket.to(payload.roomId).emit("ice-candidate", payload);
+    });
+
+    socket.on("disconnect", () => {
+        console.log("User disconnected:", socket.id);
+    });
+});
+
+httpServer.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+});

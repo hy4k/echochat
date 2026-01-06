@@ -1,106 +1,128 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { getLoginUrl } from "@/const";
-import { Heart, Lock } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Sparkles, ArrowRight, Sun, Heart, LayoutDashboard, Lock } from "lucide-react";
+import { useEffect } from "react";
+import { useLocation } from "wouter";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function Landing() {
-  const { isAuthenticated } = useAuth();
-  const [isAnimating, setIsAnimating] = useState(true);
+  const { isAuthenticated, login, loading } = useAuth();
+  const [, navigate] = useLocation();
 
   useEffect(() => {
-    // Continuous soft glow animation
-    const interval = setInterval(() => {
-      setIsAnimating((prev) => !prev);
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
+    if (isAuthenticated) {
+      navigate("/chat");
+    }
+  }, [isAuthenticated, navigate]);
 
-  if (isAuthenticated) {
-    return null; // Redirect to chat
-  }
+  const handleEnter = async () => {
+    const params = new URLSearchParams(window.location.search);
+    const userId = params.get("user") === "2" ? 2 : 1;
+    await login(userId);
+  };
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-background via-background to-[oklch(0.18_0.02_240)] flex items-center justify-center overflow-hidden relative">
-      {/* Animated background elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {/* Soft gradient orbs */}
-        <div className="absolute top-20 left-10 w-72 h-72 rounded-full bg-[oklch(0.78_0.14_45)] opacity-5 blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-20 right-10 w-96 h-96 rounded-full bg-[oklch(0.65_0.15_240)] opacity-5 blur-3xl animate-pulse" style={{ animationDelay: "1s" }}></div>
-      </div>
+    <div className="min-h-screen w-full relative flex flex-col selection:bg-accent/20">
 
-      {/* Main content */}
-      <div className="relative z-10 max-w-2xl mx-auto px-6 text-center">
-        {/* Logo/Icon */}
-        <div className="mb-12 flex justify-center">
-          <div className={`transition-all duration-1000 ${isAnimating ? "scale-100" : "scale-105"}`}>
-            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-accent to-[oklch(0.70_0.10_45)] flex items-center justify-center shadow-2xl soft-glow">
-              <Heart className="w-12 h-12 text-accent-foreground" fill="currentColor" />
-            </div>
-          </div>
+      {/* Refined Header */}
+      <header className="absolute top-0 w-full p-8 md:p-12 z-20 flex justify-between items-center opacity-0 animate-[fadeIn_1s_ease-out_forwards]">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-foreground" />
+          <span className="text-xs font-medium tracking-[0.2em] uppercase text-foreground/80">EchoChat</span>
         </div>
-
-        {/* Heading */}
-        <h1 className="text-5xl md:text-6xl font-serif font-bold mb-4 bg-gradient-to-r from-accent via-foreground to-accent bg-clip-text text-transparent">
-          EchoChat
-        </h1>
-
-        {/* Tagline */}
-        <p className="text-xl md:text-2xl text-muted-foreground mb-8 font-light">
-          A private sanctuary for two
-        </p>
-
-        {/* Description */}
-        <div className="mb-12 space-y-4">
-          <p className="text-lg text-foreground/80 leading-relaxed">
-            Exclusive, intimate, and designed just for you and one special person. Share moments through text, voice, and video in a space that feels like a shared secret.
-          </p>
-
-          {/* Features highlight */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-10">
-            <div className="p-6 rounded-xl bg-card/50 backdrop-blur-sm border border-border/50 hover:border-accent/30 transition-colors">
-              <div className="text-accent mb-3 text-2xl">💬</div>
-              <h3 className="font-serif font-semibold mb-2">Real-time Chat</h3>
-              <p className="text-sm text-muted-foreground">Text, voice, and video in perfect sync</p>
-            </div>
-
-            <div className="p-6 rounded-xl bg-card/50 backdrop-blur-sm border border-border/50 hover:border-accent/30 transition-colors">
-              <div className="text-accent mb-3 text-2xl">🌅</div>
-              <h3 className="font-serif font-semibold mb-2">Shared Horizon</h3>
-              <p className="text-sm text-muted-foreground">Weather and time sync across locations</p>
-            </div>
-
-            <div className="p-6 rounded-xl bg-card/50 backdrop-blur-sm border border-border/50 hover:border-accent/30 transition-colors">
-              <div className="text-accent mb-3 text-2xl">✨</div>
-              <h3 className="font-serif font-semibold mb-2">Keepsakes</h3>
-              <p className="text-sm text-muted-foreground">Pin favorite moments forever</p>
-            </div>
-          </div>
+        <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/50 backdrop-blur-md border border-white/50">
+          <Lock className="w-3 h-3 text-foreground/40" />
+          <span className="text-[10px] font-medium tracking-widest uppercase text-foreground/40">Private Encryption</span>
         </div>
+      </header>
 
-        {/* Call to action */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-          <a href={getLoginUrl()}>
+      <main className="flex-1 flex flex-col items-center justify-center p-4 relative z-10">
+
+        {/* Elegant Hero Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1, ease: "easeOut" }}
+          className="text-center max-w-4xl mx-auto space-y-12"
+        >
+          <div className="space-y-6">
+            <span className="inline-block py-1 px-3 rounded-full border border-foreground/10 bg-white/30 text-[10px] uppercase tracking-[0.3em] font-medium text-foreground/60">
+              Invitation Only
+            </span>
+
+            <h1 className="text-6xl md:text-8xl lg:text-9xl font-serif text-foreground leading-[0.9] tracking-tight">
+              <span className="block italic opacity-60">echo</span>
+              <span className="block">chat.space</span>
+            </h1>
+
+            <p className="text-lg md:text-xl font-light text-foreground/60 max-w-lg mx-auto leading-relaxed">
+              A permanent digital sanctuary for two. <br className="hidden md:block" />
+              Where silence speaks and memories never fade.
+            </p>
+          </div>
+
+          <div className="flex flex-col items-center gap-6">
             <Button
-              size="lg"
-              className="bg-gradient-to-r from-accent to-[oklch(0.75_0.10_45)] text-accent-foreground hover:shadow-lg hover:shadow-accent/50 transition-all font-semibold px-8"
+              onClick={handleEnter}
+              disabled={loading}
+              className="button-premium h-14 px-10 rounded-full text-xs tracking-[0.2em] font-medium bg-foreground text-background hover:bg-foreground/90 transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1"
             >
-              Begin Your Journey
+              {loading ? (
+                <div className="flex items-center gap-3">
+                  <div className="w-4 h-4 rounded-full border-2 border-background/30 border-t-background animate-spin" />
+                  <span>Opening...</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <span>Step Inside</span>
+                  <ArrowRight className="w-4 h-4 opacity-60" />
+                </div>
+              )}
             </Button>
-          </a>
-        </div>
+          </div>
+        </motion.div>
 
-        {/* Privacy note */}
-        <div className="mt-12 pt-8 border-t border-border/30 flex items-center justify-center gap-2 text-sm text-muted-foreground">
-          <Lock className="w-4 h-4" />
-          <span>Your connection is private and encrypted</span>
-        </div>
+        {/* Minimal Feature Grid */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.8, duration: 1 }}
+          className="grid grid-cols-3 gap-8 md:gap-24 mt-32 max-w-5xl mx-auto opacity-0 animate-[fadeIn_1s_ease-out_0.8s_forwards]"
+        >
+          <FeatureItem icon={<Heart className="w-5 h-5" />} label="Text" delay={0.9} />
+          <FeatureItem icon={<Sun className="w-5 h-5" />} label="Voice" delay={1.0} />
+          <FeatureItem icon={<Sparkles className="w-5 h-5" />} label="Video" delay={1.1} />
+        </motion.div>
+      </main>
 
-        {/* Footer */}
-        <div className="mt-16 text-xs text-muted-foreground/60">
-          <p>EchoChat • Where two hearts find their rhythm</p>
-        </div>
-      </div>
+      {/* Subtle Background Elements */}
+      <div className="fixed inset-0 pointer-events-none -z-10 bg-gradient-to-tr from-white/0 via-white/50 to-white/0" />
+      <div className="fixed top-[-20%] right-[-10%] w-[50vw] h-[50vw] bg-[#eaddcf]/10 rounded-full blur-[120px]" />
+      <div className="fixed bottom-[-10%] left-[-10%] w-[40vw] h-[40vw] bg-[#e6efe9]/20 rounded-full blur-[100px]" />
+
+      <footer className="absolute bottom-8 w-full text-center">
+        <span className="text-[10px] uppercase tracking-[0.4em] text-foreground/20 font-medium">
+          v3.0 • Premium Edition
+        </span>
+      </footer>
     </div>
   );
+}
+
+function FeatureItem({ icon, label, delay }: any) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay, duration: 0.8 }}
+      className="flex flex-col items-center gap-4 group cursor-default"
+    >
+      <div className="w-12 h-12 rounded-2xl bg-white/50 border border-white/60 flex items-center justify-center text-foreground/40 group-hover:text-foreground/80 group-hover:scale-105 transition-all duration-500 shadow-sm">
+        {icon}
+      </div>
+      <span className="text-[10px] uppercase tracking-[0.2em] text-foreground/40 group-hover:text-foreground/60 transition-colors font-medium text-center">
+        {label}
+      </span>
+    </motion.div>
+  )
 }
