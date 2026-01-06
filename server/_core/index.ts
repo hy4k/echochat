@@ -9,6 +9,7 @@ if (!globalThis.crypto) {
 }
 
 import { setupVite, serveStatic } from "./vite";
+import { bootstrapDb } from "../db";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { appRouter } from "../routers/index";
 import cors from "cors";
@@ -16,6 +17,11 @@ import "dotenv/config";
 
 const app = express();
 const httpServer = createServer(app);
+
+// Bootstrap Database in production
+if (process.env.NODE_ENV === "production") {
+    await bootstrapDb();
+}
 
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());

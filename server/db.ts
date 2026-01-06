@@ -25,6 +25,36 @@ import {
 let _db: ReturnType<typeof drizzle> | null = null;
 let _client: any = null;
 
+export async function bootstrapDb() {
+  if (process.env.NODE_ENV !== "production") return;
+
+  const client = postgres(process.env.DATABASE_URL!, { ssl: 'require' });
+  const db = drizzle(client);
+
+  console.log("[Database] Bootstrapping schema...");
+  try {
+    // Ensure users table exists with the unique constraint Drizzle expects
+    await client.unsafe(`
+      CREATE TABLE IF NOT EXISTS "users" (
+        "id" SERIAL PRIMARY KEY,
+        "openId" VARCHAR(64) NOT NULL UNIQUE,
+        "name" TEXT,
+        "email" VARCHAR(320),
+        "loginMethod" VARCHAR(64),
+        "role" TEXT DEFAULT 'user' NOT NULL,
+        "createdAt" TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+        "updatedAt" TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+        "lastSignedIn" TIMESTAMPTZ DEFAULT NOW() NOT NULL
+      );
+    `);
+    console.log("[Database] Schema boostrapped successfully.");
+  } catch (err) {
+    console.error("[Database] Bootstrap failed:", err);
+  } finally {
+    await client.end();
+  }
+}
+
 // In-memory mock storage for development when DB is unavailable
 const mockStore = {
   users: [
@@ -68,13 +98,25 @@ export async function upsertUser(values: InsertUser) {
   const updateSet: Partial<InsertUser> = { ...values };
   delete updateSet.openId;
 
-  await db
-    .insert(users)
-    .values(values)
-    .onConflictDoUpdate({
-      target: users.openId,
-      set: updateSet,
+  try {
+    await db
+      .insert(users)
+      .values(values)
+      .onConflictDoUpdate({
+        target: users.openId,
+        set: updateSet,
+      });
+  } catch (error: any) {
+    console.error("[Database Error] Upsert failed:", {
+      message: error.message,
+      code: error.code,
+      detail: error.detail,
+      hint: error.hint,
+      query: error.query,
+      params: error.params
     });
+    throw error;
+  }
 }
 
 export async function getUserByOpenId(openId: string): Promise<User | undefined> {
