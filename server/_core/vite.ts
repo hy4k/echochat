@@ -33,7 +33,11 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: Express) {
-    const distPath = path.resolve(__dirname, "../public");
+    // In production (dist/), the structure is flattened:
+    // /app/dist/index.js (this file)
+    // /app/dist/public/ (static assets)
+    // So if __dirname is /app/dist, we look for ./public
+    const distPath = path.resolve(__dirname, "public");
     if (!fs.existsSync(distPath)) {
         throw new Error(`Could not find build directory: ${distPath}`);
     }
