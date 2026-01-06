@@ -33,7 +33,7 @@ export async function bootstrapDb() {
 
   console.log("[Database] Bootstrapping schema...");
   try {
-    // Ensure users table exists with the unique constraint Drizzle expects
+    // 1. Create table if not exists
     await client.unsafe(`
       CREATE TABLE IF NOT EXISTS "users" (
         "id" SERIAL PRIMARY KEY,
@@ -46,17 +46,28 @@ export async function bootstrapDb() {
         "updatedAt" TIMESTAMPTZ DEFAULT NOW() NOT NULL,
         "lastSignedIn" TIMESTAMPTZ DEFAULT NOW() NOT NULL
       );
+    `);
 
+    // 2. Surgical repair: Ensure unique constraint exists even if table existed before
+    await client.unsafe(`
       DO $$ 
       BEGIN 
-        IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE tablename = 'users' AND indexname = 'users_openId_unique') THEN
-          CREATE UNIQUE INDEX "users_openId_unique" ON "users" ("openId");
-        END IF;
+        BEGIN
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'users_openId_unique') THEN
+            ALTER TABLE "users" ADD CONSTRAINT "users_openId_unique" UNIQUE ("openId");
+          END IF;
+        EXCEPTION WHEN OTHERS THEN
+          RAISE NOTICE 'Constraint might already exist or table is in a different state';
+        END;
       END $$;
     `);
     console.log("[Database] Schema boostrapped successfully.");
-  } catch (err) {
-    console.error("[Database] Bootstrap failed:", err);
+  } catch (err: any) {
+    console.error("[Database] Bootstrap failed deeply:", {
+      message: err.message,
+      detail: err.detail,
+      query: err.query
+    });
   } finally {
     await client.end();
   }
