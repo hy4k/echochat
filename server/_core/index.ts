@@ -15,12 +15,17 @@ import { appRouter } from "../routers/index";
 import cors from "cors";
 import "dotenv/config";
 
+console.log("[Server] process started, initializing...");
+
 const app = express();
 const httpServer = createServer(app);
 
-// Bootstrap Database in production
+// Bootstrap Database in production (non-blocking)
 if (process.env.NODE_ENV === "production") {
-    await bootstrapDb();
+    console.log("[Server] Production mode detected, triggering bootstrap...");
+    bootstrapDb().catch(err => {
+        console.error("[Database] Background bootstrap failed:", err);
+    });
 }
 
 app.use(cors({ origin: true, credentials: true }));
