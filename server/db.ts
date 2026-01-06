@@ -37,7 +37,7 @@ export async function bootstrapDb() {
     await client.unsafe(`
       CREATE TABLE IF NOT EXISTS "users" (
         "id" SERIAL PRIMARY KEY,
-        "openId" VARCHAR(64) NOT NULL UNIQUE,
+        "openId" VARCHAR(64) NOT NULL,
         "name" TEXT,
         "email" VARCHAR(320),
         "loginMethod" VARCHAR(64),
@@ -46,6 +46,13 @@ export async function bootstrapDb() {
         "updatedAt" TIMESTAMPTZ DEFAULT NOW() NOT NULL,
         "lastSignedIn" TIMESTAMPTZ DEFAULT NOW() NOT NULL
       );
+
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE tablename = 'users' AND indexname = 'users_openId_unique') THEN
+          CREATE UNIQUE INDEX "users_openId_unique" ON "users" ("openId");
+        END IF;
+      END $$;
     `);
     console.log("[Database] Schema boostrapped successfully.");
   } catch (err) {
@@ -69,9 +76,9 @@ const mockStore = {
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL && !process.env.DATABASE_URL.includes("[YOUR-PASSWORD]")) {
     try {
-      _client = postgres(process.env.DATABASE_URL);
+      _client = postgres(process.env.DATABASE_URL, { ssl: 'require' });
       _db = drizzle(_client);
-      console.log("[Database] Connected to PostgreSQL");
+      console.log("[Database] Connected to PostgreSQL (SSL)");
     } catch (error) {
       console.warn("[Database] Failed to connect, falling back to mock storage.");
       _db = null;
