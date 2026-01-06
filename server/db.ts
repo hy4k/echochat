@@ -28,29 +28,51 @@ let _client: any = null;
 export async function bootstrapDb() {
   if (process.env.NODE_ENV !== "production") return;
 
-  const client = postgres(process.env.DATABASE_URL!, { ssl: 'require' });
-
-  console.log("[Database] Bootstrapping users table...");
-  try {
-    await client.unsafe(`
-      CREATE TABLE IF NOT EXISTS "users" (
-        "id" SERIAL PRIMARY KEY,
-        "openId" VARCHAR(64) NOT NULL UNIQUE,
-        "name" TEXT,
-        "email" VARCHAR(320),
-        "loginMethod" VARCHAR(64),
-        "role" TEXT DEFAULT 'user' NOT NULL,
-        "createdAt" TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-        "updatedAt" TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-        "lastSignedIn" TIMESTAMPTZ DEFAULT NOW() NOT NULL
-      );
-    `);
-    console.log("[Database] Users table verified.");
-  } catch (err: any) {
-    console.warn("[Database] Bootstrap message:", err.message);
-  } finally {
-    await client.end();
+  const url = process.env.DATABASE_URL;
+  if (!url || url.includes("[YOUR-PASSWORD]")) {
+    console.warn("[Database] Skipping bootstrap: Invalid DATABASE_URL");
+    return;
   }
+
+  console.log("[Database] Starting bootstrap process...");
+  let client;
+  try {
+    // Try with SSL
+    console.log("[Database] Bootstrapping (SSL attempt)...");
+    client = postgres(url, { ssl: 'require', connect_timeout: 10 });
+    await client.unsafe(`SELECT 1`); // Test connection
+    await runBootstrap(client);
+    console.log("[Database] Bootstrap successful (SSL)");
+  } catch (err: any) {
+    console.warn("[Database] Bootstrap SSL failed, trying non-SSL...", err.message);
+    try {
+      if (client) await client.end();
+      client = postgres(url, { connect_timeout: 10 });
+      await client.unsafe(`SELECT 1`); // Test connection
+      await runBootstrap(client);
+      console.log("[Database] Bootstrap successful (Non-SSL)");
+    } catch (innerErr: any) {
+      console.error("[Database] Bootstrap TOTAL FAILURE:", innerErr.message);
+    }
+  } finally {
+    if (client) await client.end();
+  }
+}
+
+async function runBootstrap(client: any) {
+  await client.unsafe(`
+    CREATE TABLE IF NOT EXISTS "users" (
+      "id" SERIAL PRIMARY KEY,
+      "openId" VARCHAR(64) NOT NULL UNIQUE,
+      "name" TEXT,
+      "email" VARCHAR(320),
+      "loginMethod" VARCHAR(64),
+      "role" TEXT DEFAULT 'user' NOT NULL,
+      "createdAt" TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+      "updatedAt" TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+      "lastSignedIn" TIMESTAMPTZ DEFAULT NOW() NOT NULL
+    );
+  `);
 }
 
 // In-memory mock storage for development when DB is unavailable
