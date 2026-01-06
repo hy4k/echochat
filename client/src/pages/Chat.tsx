@@ -169,28 +169,61 @@ export default function Chat() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Limit to 5MB
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("File is too heavy for the sanctuary winds.");
-      return;
-    }
+    // Helper: Compress image to avoid 413 Payload Too Large
+    const compressImage = (file: File): Promise<string> => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+          const img = new Image();
+          img.src = event.target?.result as string;
+          img.onload = () => {
+            const canvas = document.createElement("canvas");
+            const MAX_WIDTH = 1200;
+            const MAX_HEIGHT = 1200;
+            let width = img.width;
+            let height = img.height;
 
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const base64 = reader.result as string;
-      try {
-        await sendMessageMutation.mutateAsync({
-          receiverId: otherUserQuery.data?.id,
-          content: "", // No text content
-          mediaUrl: base64,
-          messageType: file.type.startsWith("image/") ? "image" : "file"
-        });
-        toast.success("Memory shared.");
-      } catch (err) {
-        toast.error("Failed to share memory.");
-      }
+            if (width > height) {
+              if (width > MAX_WIDTH) {
+                height *= MAX_WIDTH / width;
+                width = MAX_WIDTH;
+              }
+            } else {
+              if (height > MAX_HEIGHT) {
+                width *= MAX_HEIGHT / height;
+                height = MAX_HEIGHT;
+              }
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext("2d");
+            ctx?.drawImage(img, 0, 0, width, height);
+
+            // Compress to JPEG at 80% quality
+            resolve(canvas.toDataURL("image/jpeg", 0.8));
+          };
+          img.onerror = reject;
+        };
+        reader.onerror = reject;
+      });
     };
-    reader.readAsDataURL(file);
+
+    try {
+      toast.info("Preparing memory...");
+      const base64 = await compressImage(file);
+
+      await sendMessageMutation.mutateAsync({
+        receiverId: otherUserQuery.data?.id,
+        content: "", // No text content
+        mediaUrl: base64,
+        messageType: "image"
+      });
+      toast.success("Memory shared.");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to share memory.");
+    }
   };
 
   const KAOMOJI_CATEGORIES = [
