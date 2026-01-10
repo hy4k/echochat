@@ -16,14 +16,13 @@ export const appRouter = router({
         login: publicProcedure
             .input(z.object({ username: z.string() }))
             .mutation(async ({ input }) => {
-                const username = input.username.toLowerCase();
-                const allowedUsers = ["mithun", "yashika"];
+                const username = input.username.toLowerCase().trim();
 
-                if (!allowedUsers.includes(username)) {
-                    throw new Error("Access denied. Invitation only.");
+                if (!username || username.length === 0) {
+                    throw new Error("Username cannot be empty.");
                 }
 
-                const name = username.charAt(0).toUpperCase() + username.slice(1);
+                const name = input.username.trim();
                 const openId = username;
 
                 const { sdk } = await import("../_core/sdk");
@@ -45,14 +44,13 @@ export const appRouter = router({
     chat: router({
         getMessages: protectedProcedure
             .query(async ({ ctx }) => {
+                const partner = await db.getPartner(ctx.user.id);
+                if (!partner) return [];
                 return await db.getMessagesForUser(ctx.user.id);
             }),
         getOtherUser: protectedProcedure
             .query(async ({ ctx }) => {
-                // In this two-person sanctuary, the "other user" is whoever is not me.
-                // For guests, it's just swapping 1 and 2, but let's be more dynamic.
-                const allUsers = await db.getAllUsers();
-                return allUsers.find(u => u.id !== ctx.user.id) || null;
+                return await db.getPartner(ctx.user.id) || null;
             }),
         sendMessage: protectedProcedure
             .input(z.object({
@@ -62,19 +60,13 @@ export const appRouter = router({
                 messageType: z.enum(["text", "image", "file", "voice", "video"]).optional()
             }))
             .mutation(async ({ input, ctx }) => {
-                let receiverId = input.receiverId;
-
-                if (!receiverId) {
-                    const allUsers = await db.getAllUsers();
-                    const other = allUsers.find(u => u.id !== ctx.user.id);
-                    if (!other) throw new Error("No partner found in sanctuary.");
-                    receiverId = other.id;
-                }
+                const partner = await db.getPartner(ctx.user.id);
+                if (!partner) throw new Error("No partner connected.");
 
                 return await db.createMessage({
                     senderId: ctx.user.id,
-                    receiverId: receiverId,
-                    content: input.content || "",  // Content can be empty for images
+                    receiverId: partner.id,
+                    content: input.content || "",
                     mediaUrl: input.mediaUrl,
                     messageType: input.messageType || "text",
                 });
@@ -84,13 +76,12 @@ export const appRouter = router({
         sendBottle: protectedProcedure
             .input(z.object({ content: z.string() }))
             .mutation(async ({ input, ctx }) => {
-                const allUsers = await db.getAllUsers();
-                const other = allUsers.find(u => u.id !== ctx.user.id);
-                if (!other) throw new Error("No partner found.");
+                const partner = await db.getPartner(ctx.user.id);
+                if (!partner) throw new Error("No partner connected.");
 
                 return await db.createOfflineMessage({
                     senderId: ctx.user.id,
-                    receiverId: other.id,
+                    receiverId: partner.id,
                     content: input.content,
                     messageType: "text",
                     viewed: 0

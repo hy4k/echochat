@@ -33,6 +33,7 @@ export default function Chat() {
   const [isCalling, setIsCalling] = useState(false);
   const [callType, setCallType] = useState<"audio" | "video" | null>(null);
   const [incomingCall, setIncomingCall] = useState<{ type: "audio" | "video", offer: any } | null>(null);
+  const [partnerName, setPartnerName] = useState<string | null>(null);
 
   const socketRef = useRef<Socket | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
@@ -41,13 +42,22 @@ export default function Chat() {
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
 
   const messagesQuery = trpc.chat.getMessages.useQuery(undefined, {
-    refetchInterval: 3000,
+    refetchInterval: 1000,
     enabled: !!user,
   });
 
   const otherUserQuery = trpc.chat.getOtherUser.useQuery(undefined, {
     enabled: !!user,
+    refetchInterval: 1000,
+    staleTime: 0,
+    gcTime: 0,
   });
+
+  useEffect(() => {
+    if (otherUserQuery.data?.name) {
+      setPartnerName(otherUserQuery.data.name);
+    }
+  }, [otherUserQuery.data?.name]);
 
   const [showBottleInput, setShowBottleInput] = useState(false);
   const [showSmileys, setShowSmileys] = useState(false);
@@ -393,18 +403,18 @@ export default function Chat() {
             className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm"
           >
             <div className="bg-white p-8 rounded-3xl shadow-2xl flex flex-col items-center gap-6 max-w-sm w-full">
-              <div className="w-20 h-20 rounded-full bg-accent/10 flex items-center justify-center animate-pulse">
-                {incomingCall.type === "video" ? <Video className="w-8 h-8 text-accent" /> : <Phone className="w-8 h-8 text-accent" />}
+              <div className="w-20 h-20 rounded-full bg-rose-100 flex items-center justify-center animate-pulse">
+                {incomingCall.type === "video" ? <Video className="w-8 h-8 text-rose-600" /> : <Phone className="w-8 h-8 text-rose-600" />}
               </div>
               <div className="text-center">
-                <h3 className="text-xl font-bold text-foreground">Incoming Call</h3>
-                <p className="text-muted-foreground text-sm">Partner is trying to reach you...</p>
+                <h3 className="text-xl font-bold text-foreground">{otherUserQuery.data?.name || "Partner"} is calling...</h3>
+                <p className="text-muted-foreground text-sm">{incomingCall.type === "video" ? "Video Call" : "Voice Call"}</p>
               </div>
               <div className="flex gap-4 w-full">
                 <Button onClick={() => setIncomingCall(null)} variant="destructive" className="flex-1 h-12 rounded-xl">
-                  Decline
+                  Reject
                 </Button>
-                <Button onClick={acceptCall} className="flex-1 h-12 rounded-xl bg-accent hover:bg-accent/90 text-white">
+                <Button onClick={acceptCall} className="flex-1 h-12 rounded-xl bg-green-600 hover:bg-green-700 text-white">
                   Accept
                 </Button>
               </div>
@@ -496,10 +506,9 @@ export default function Chat() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-background/95 backdrop-blur-md"
+            className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-background/95 backdrop-blur-md p-4"
           >
-            <div className="flex flex-col items-center gap-8 w-full max-w-4xl p-8 h-full">
-              <div className="relative w-full flex-1 bg-black rounded-[3rem] overflow-hidden border border-foreground/5 shadow-2xl flex items-center justify-center">
+            <div className="relative w-full flex-1 bg-black rounded-[3rem] overflow-hidden border border-foreground/5 shadow-2xl flex items-center justify-center max-h-[70vh]">
 
                 {/* Remote Stream */}
                 <video
@@ -526,67 +535,86 @@ export default function Chat() {
                       ref={localVideoRef}
                       autoPlay
                       playsInline
-                      className="w-full h-full object-cover transform -scale-x-100" // Mirror effect
+                      className="w-full h-full object-cover transform -scale-x-100"
                     />
                   </div>
                 )}
+            </div>
 
-                {/* Controls */}
-                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-6">
-                  <Button
-                    onClick={endCall}
-                    size="lg"
-                    className="h-16 w-16 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-xl transition-transform hover:scale-110"
-                  >
-                    <Phone className="w-6 h-6 rotate-[135deg]" />
-                  </Button>
-                </div>
-              </div>
+            {/* Controls - Below video */}
+            <div className="flex items-center gap-6 mt-8">
+              <Button
+                onClick={() => {
+                  if (localStreamRef.current) {
+                    const audioTrack = localStreamRef.current.getAudioTracks()[0];
+                    if (audioTrack) {
+                      audioTrack.enabled = !audioTrack.enabled;
+                      toast.info(audioTrack.enabled ? "Microphone on" : "Microphone muted");
+                    }
+                  }
+                }}
+                size="lg"
+                className="h-14 w-14 rounded-full bg-white/20 text-white hover:bg-white/30 shadow-xl transition-transform hover:scale-110 border border-white/30"
+              >
+                <Mic className="w-5 h-5" />
+              </Button>
+              <Button
+                onClick={endCall}
+                size="lg"
+                className="h-16 w-16 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-xl transition-transform hover:scale-110"
+              >
+                <Phone className="w-6 h-6 rotate-[135deg]" />
+              </Button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* Header */}
-      <header className="glass-card border-x-0 border-t-0 sticky top-0 z-50 px-4 py-4 md:px-8 bg-white/40 pt-[calc(env(safe-area-inset-top)+1rem)]">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-5">
+      <header className="fixed top-0 left-0 right-0 z-50 px-3 py-3 bg-white/95 backdrop-blur-md border-b border-white/20 safe-area-inset-top">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 flex-1">
             <motion.div
               whileHover={{ rotate: 15 }}
-              className="w-10 h-10 bg-white/60 backdrop-blur-xl rounded-xl flex items-center justify-center border-accent/20 cursor-pointer shadow-sm"
+              className="w-9 h-9 bg-white/60 backdrop-blur-xl rounded-lg flex items-center justify-center cursor-pointer shadow-sm"
               onClick={() => navigate("/")}
             >
-              <Heart className="w-6 h-6 text-accent fill-accent" />
+              <Heart className="w-5 h-5 text-accent fill-accent" />
             </motion.div>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight mb-1 text-foreground">
-                {user?.name ? `${user.name}'s Horizon` : "Whisper Stream"}
+            <div className="flex-1 min-w-0">
+              <h1 className="text-sm font-bold tracking-tight text-foreground truncate">
+                {user?.name} & {partnerName || "..."}
               </h1>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
                 <motion.span
                   animate={{ opacity: [0.5, 1, 0.5] }}
                   transition={{ duration: 2, repeat: Infinity }}
-                  className="w-2 h-2 rounded-full bg-accent shadow-[0_0_10px_rgba(255,107,107,0.5)]"
+                  className="w-1.5 h-1.5 rounded-full bg-rose-500"
                 />
-                <p className="text-[10px] uppercase tracking-[0.2em] text-accent/80 font-black">
-                  Souls Linked
+                <p className="text-[9px] uppercase tracking-widest text-rose-600/80 font-black">
+                  Connected
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <HeaderButton icon={<Phone className="w-5 h-5" />} onClick={() => startCall("audio")} title="Voice Call" />
-            <HeaderButton icon={<Video className="w-5 h-5" />} onClick={() => startCall("video")} title="Video Call" />
-            <div className="h-6 w-[1px] bg-accent/10 mx-1" />
-            <HeaderButton icon={<LogOut className="w-4 h-4" />} onClick={handleLogout} variant="destructive" title="Depart Sanctuary" />
+          <div className="flex items-center gap-1">
+            <Button size="icon" onClick={() => startCall("audio")} className="h-9 w-9 rounded-lg bg-blue-500 hover:bg-blue-600 text-white" title="Voice Call">
+              <Phone className="w-4 h-4" />
+            </Button>
+            <Button size="icon" onClick={() => startCall("video")} className="h-9 w-9 rounded-lg bg-purple-500 hover:bg-purple-600 text-white" title="Video Call">
+              <Video className="w-4 h-4" />
+            </Button>
+            <Button size="icon" onClick={handleLogout} className="h-9 w-9 rounded-lg bg-red-500 hover:bg-red-600 text-white" title="Logout">
+              <LogOut className="w-4 h-4" />
+            </Button>
           </div>
         </div>
       </header>
 
       {/* Messages area */}
-      <main className="flex-1 overflow-y-auto px-4 py-6 md:px-8">
-        <div className="max-w-4xl mx-auto space-y-6">
+      <main className="flex-1 overflow-y-auto px-3 py-4 mt-[60px] mb-[80px]">
+        <div className="space-y-3">
           {messages.length === 0 ? (
             <div className="h-[60vh] flex flex-col items-center justify-center text-center">
               <motion.div
@@ -624,9 +652,9 @@ export default function Chat() {
                     className={`flex ${isMe ? "justify-end" : "justify-start"}`}
                   >
                     <div className={`group flex flex-col ${isMe ? "items-end" : "items-start"} max-w-[80%]`}>
-                      <div className={`p-6 rounded-[2.5rem] shadow-sm font-medium leading-relaxed overflow-hidden ${isMe
-                        ? "bg-accent text-accent-foreground rounded-tr-none shadow-lg shadow-accent/10"
-                        : "bg-white/70 backdrop-blur-md text-foreground rounded-tl-none border border-white/60 shadow-lg shadow-black/5"
+                    <div className={`p-4 rounded-2xl shadow-sm font-medium leading-relaxed overflow-hidden ${isMe
+                        ? "bg-amber-600 text-white rounded-tr-none shadow-lg shadow-amber-600/20"
+                        : "bg-rose-100 text-foreground rounded-tl-none border border-rose-200 shadow-lg shadow-rose-200/30"
                         }`}>
                         {message.messageType === "image" ? (
                           <img src={message.mediaUrl} alt="Shared memory" className="max-w-full rounded-xl" />
@@ -634,7 +662,7 @@ export default function Chat() {
                           <p className="text-base">{message.content}</p>
                         )}
                       </div>
-                      <div className={`flex items-center gap-3 mt-3 px-3 text-[10px] font-black uppercase tracking-[0.2em] ${isMe ? "text-accent/40" : "text-muted-foreground/30"}`}>
+                      <div className={`flex items-center gap-2 mt-2 px-2 text-[9px] font-black uppercase tracking-widest ${isMe ? "text-amber-700/40" : "text-rose-700/30"}`}>
                         <span>{new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
                         {isMe && <StatusIndicator status="read" />}
                       </div>
@@ -649,15 +677,12 @@ export default function Chat() {
       </main>
 
       {/* Input area */}
-      <footer className="px-4 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-2 mt-auto">
-        <div className="max-w-4xl mx-auto bg-white/70 backdrop-blur-3xl p-2 rounded-[2.5rem] border border-white/50 shadow-2xl">
-          <div className="flex gap-2 items-center">
-            {/* Bottle Button */}
-            <Button variant="ghost" size="icon" onClick={() => setShowBottleInput(true)} className="w-12 h-12 rounded-full bg-black/5 hover:bg-black/10 transition-colors text-foreground/60 shrink-0">
-              <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-7-1.9-3-1.7-5-3-7h-2c-1.3 2-1.1 4-3 7-2 3.1-3 5-3 7a7 7 0 0 0 7 7z" /></svg>
+      <footer className="fixed bottom-0 left-0 right-0 z-40 px-2 pb-2 pt-2 bg-white/95 backdrop-blur-md border-t border-white/20 safe-area-inset-bottom">
+        <div className="bg-white/70 backdrop-blur-3xl p-2 rounded-2xl border border-white/50 shadow-lg">
+          <div className="flex gap-1.5 items-center">
+            <Button variant="ghost" size="icon" onClick={() => setShowBottleInput(true)} className="w-10 h-10 rounded-lg bg-black/5 hover:bg-black/10 text-foreground/60 shrink-0">
+              <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-7-1.9-3-1.7-5-3-7h-2c-1.3 2-1.1 4-3 7-2 3.1-3 5-3 7a7 7 0 0 0 7 7z" /></svg>
             </Button>
-
-            {/* Attachment Button */}
             <input
               type="file"
               ref={fileInputRef}
@@ -665,69 +690,28 @@ export default function Chat() {
               accept="image/*"
               onChange={handleFileUpload}
             />
-            <Button variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()} className="w-12 h-12 rounded-full bg-black/5 hover:bg-black/10 transition-colors text-foreground/60 shrink-0">
+            <Button variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()} className="w-10 h-10 rounded-lg bg-black/5 hover:bg-black/10 text-foreground/60 shrink-0">
               <Paperclip className="w-5 h-5" />
             </Button>
-            <div className="flex-1 relative">
-              <Input
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSendMessage();
-                  }
-                }}
-                placeholder="Whisper something..."
-                className="bg-transparent border-none shadow-none text-foreground placeholder:text-foreground/30 h-14 px-6 text-lg font-medium focus-visible:ring-0"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-
-              {/* Expression Picker Trigger */}
-              <div className="relative">
-                <Button variant="ghost" size="icon" onClick={() => setShowSmileys(!showSmileys)} className="w-12 h-12 rounded-full bg-black/5 hover:bg-black/10 transition-colors text-foreground/60 shrink-0">
-                  <Sparkles className="w-5 h-5" />
-                </Button>
-                <AnimatePresence>
-                  {showSmileys && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.9, y: 10 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.9, y: 10 }}
-                      className="absolute bottom-16 right-0 w-64 bg-white/90 backdrop-blur-xl border border-white/50 p-4 rounded-3xl shadow-xl z-50"
-                    >
-                      <div className="space-y-4">
-                        {KAOMOJI_CATEGORIES.map((cat) => (
-                          <div key={cat.name}>
-                            <h4 className="text-[10px] uppercase font-bold text-foreground/40 mb-2 tracking-widest">{cat.name}</h4>
-                            <div className="flex flex-wrap gap-2">
-                              {cat.items.map((item) => (
-                                <button
-                                  key={item}
-                                  onClick={() => { setInputValue(prev => prev + item + " "); setShowSmileys(false); }}
-                                  className="text-xs py-1 px-2 bg-accent/5 hover:bg-accent/20 rounded-lg text-foreground/80 hover:text-accent transition-colors"
-                                >
-                                  {item}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              <Button
-                onClick={handleSendMessage}
-                disabled={!inputValue.trim()}
-                className="w-12 h-12 rounded-full p-0 flex items-center justify-center shrink-0 bg-accent text-accent-foreground hover:bg-accent/90 transition-transform shadow-lg border-none"
-              >
-                <Send className="w-5 h-5 ml-0.5" />
-              </Button>
-            </div>
+            <Input
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage();
+                }
+              }}
+              placeholder="Message..."
+              className="bg-transparent border-none shadow-none text-foreground placeholder:text-foreground/30 h-10 px-3 text-sm focus-visible:ring-0"
+            />
+            <Button
+              onClick={handleSendMessage}
+              disabled={!inputValue.trim()}
+              className="w-10 h-10 rounded-lg p-0 flex items-center justify-center shrink-0 bg-accent text-accent-foreground hover:bg-accent/90 transition-transform shadow-lg border-none"
+            >
+              <Send className="w-4 h-4" />
+            </Button>
           </div>
         </div>
       </footer>
@@ -742,16 +726,3 @@ function StatusIndicator({ status }: { status: string }) {
   return null;
 }
 
-function HeaderButton({ icon, onClick, title, variant = "ghost" }: { icon: React.ReactNode, onClick?: () => void, title: string, variant?: "ghost" | "destructive" }) {
-  return (
-    <Button
-      variant="ghost"
-      size="icon"
-      onClick={onClick}
-      className={`glass-card w-10 h-10 rounded-xl border-white/5 transition-all text-muted-foreground hover:text-accent group ${variant === "destructive" ? "hover:text-destructive hover:border-destructive/20" : "hover:border-accent/20"}`}
-      title={title}
-    >
-      <div className="group-hover:scale-110 transition-transform">{icon}</div>
-    </Button>
-  );
-}

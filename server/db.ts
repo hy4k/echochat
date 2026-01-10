@@ -77,9 +77,7 @@ async function runBootstrap(client: any) {
 
 // In-memory mock storage for development when DB is unavailable
 const mockStore = {
-  users: [
-    { id: 1, openId: "dev-user", name: "Echo Partner", email: "dev@echochat.space", createdAt: new Date(), lastSignedIn: new Date(), role: "user" }
-  ] as User[],
+  users: [] as User[],
   messages: [] as any[],
   keepsakes: [] as any[],
   presence: new Map<number, any>(),
@@ -329,6 +327,12 @@ export async function getSharedHorizonForUser(userId: number) {
   // @ts-ignore
   const result = await db.select().from(sharedHorizon).where(eq(sharedHorizon.userId, userId)).limit(1);
   return result.length > 0 ? result[0] : null;
+}
+
+export async function getPartner(userId: number): Promise<User | null> {
+  const allUsers = await getAllUsers();
+  const partner = allUsers.find(u => u.id !== userId);
+  return partner || null;
 }
 
 export async function getMessageStats(userId: number) {
