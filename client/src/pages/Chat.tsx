@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
 import {
   LogOut, MessageCircle, Phone, Video, Check, CheckCheck,
-  Sparkles, Sun, Heart, Send, Mic, Paperclip, X, RotateCcw
+  Sparkles, Sun, Heart, Send, Mic, Paperclip, X, RotateCcw, PenTool
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
@@ -604,6 +604,9 @@ export default function Chat() {
             </Button>
             <Button size="icon" onClick={() => startCall("video")} className="h-9 w-9 rounded-lg bg-purple-500 hover:bg-purple-600 text-white" title="Video Call">
               <Video className="w-4 h-4" />
+            </Button>
+            <Button size="icon" onClick={() => navigate("/whiteboard")} className="h-9 w-9 rounded-lg bg-cyan-500 hover:bg-cyan-600 text-white" title="Shared Whiteboard">
+              <PenTool className="w-4 h-4" />
             </Button>
             <Button size="icon" onClick={handleLogout} className="h-9 w-9 rounded-lg bg-red-500 hover:bg-red-600 text-white" title="Logout">
               <LogOut className="w-4 h-4" />

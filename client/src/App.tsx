@@ -6,6 +6,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Landing from "./pages/Landing";
 import Chat from "./pages/Chat";
+import Whiteboard from "./pages/Whiteboard";
 import { useAuth } from "./_core/hooks/useAuth";
 
 function Router() {
@@ -29,6 +30,9 @@ function Router() {
       </Route>
       <Route path="/chat">
         {isAuthenticated ? <Chat /> : <Landing />}
+      </Route>
+      <Route path="/whiteboard">
+        {isAuthenticated ? <Whiteboard /> : <Landing />}
       </Route>
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />

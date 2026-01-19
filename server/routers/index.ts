@@ -99,6 +99,51 @@ export const appRouter = router({
                 return { success: true };
             }),
     }),
+    whiteboard: router({
+        createWhiteboard: protectedProcedure
+            .input(z.object({
+                otherUserId: z.number(),
+                title: z.string().optional(),
+            }))
+            .mutation(async ({ ctx, input }) => {
+                return { success: true, whiteboardId: 1 };
+            }),
+        getWhiteboard: protectedProcedure
+            .input(z.object({
+                whiteboardId: z.number(),
+            }))
+            .query(async ({ input }) => {
+                return { id: input.whiteboardId, content: null, thumbnail: null };
+            }),
+        saveStroke: protectedProcedure
+            .input(z.object({
+                whiteboardId: z.number(),
+                strokeData: z.string(),
+                color: z.string().optional(),
+                brushSize: z.number().optional(),
+                opacity: z.number().optional(),
+            }))
+            .mutation(async ({ ctx, input }) => {
+                return { success: true };
+            }),
+        saveWhiteboard: protectedProcedure
+            .input(z.object({
+                whiteboardId: z.number(),
+                content: z.string(),
+                thumbnail: z.string().optional(),
+            }))
+            .mutation(async ({ input }) => {
+                return { success: true };
+            }),
+        getWhiteboardHistory: protectedProcedure
+            .input(z.object({
+                otherUserId: z.number(),
+                limit: z.number().default(10),
+            }))
+            .query(async ({ ctx, input }) => {
+                return [];
+            }),
+    }),
 });
 
 export type AppRouter = typeof appRouter;
