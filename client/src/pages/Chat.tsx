@@ -2,6 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
+import WebRTCCall from "@/components/WebRTCCall";
 import {
   LogOut, MessageCircle, Phone, Video, Check, CheckCheck,
   Sparkles, Sun, Heart, Send, Mic, Paperclip, X, RotateCcw, PenTool
@@ -34,6 +35,8 @@ export default function Chat() {
   const [callType, setCallType] = useState<"audio" | "video" | null>(null);
   const [incomingCall, setIncomingCall] = useState<{ type: "audio" | "video", offer: any } | null>(null);
   const [partnerName, setPartnerName] = useState<string | null>(null);
+  const [useWebRTCComponent, setUseWebRTCComponent] = useState(false);
+  const [remoteUserId, setRemoteUserId] = useState<number>(2); // Assuming partner ID is 2
 
   const socketRef = useRef<Socket | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
@@ -386,7 +389,17 @@ export default function Chat() {
     setIsCalling(false);
     setCallType(null);
     setIncomingCall(null);
+    setUseWebRTCComponent(false);
     toast.info("Call ended.");
+  };
+
+  const handleStartCall = async (type: "audio" | "video") => {
+    setCallType(type);
+    setUseWebRTCComponent(true);
+    setIsCalling(true);
+    
+    // Notify remote user of incoming call
+    socketRef.current?.emit("call:initiate", remoteUserId, type);
   };
 
   const messages = messagesQuery.data || [];
@@ -499,9 +512,23 @@ export default function Chat() {
         )}
       </AnimatePresence>
 
-      {/* Call Overlay */}
+      {/* WebRTC Call Component */}
       <AnimatePresence>
-        {isCalling && (
+        {useWebRTCComponent && callType && isCalling && (
+          <WebRTCCall
+            socket={socketRef.current}
+            localUserId={user?.id || 1}
+            remoteUserId={remoteUserId}
+            callType={callType}
+            onCallEnd={endCall}
+            partnerName={partnerName || "Partner"}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Fallback Call Overlay (for compatibility) */}
+      <AnimatePresence>
+        {isCalling && !useWebRTCComponent && (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -599,10 +626,10 @@ export default function Chat() {
           </div>
 
           <div className="flex items-center gap-1">
-            <Button size="icon" onClick={() => startCall("audio")} className="h-9 w-9 rounded-lg bg-blue-500 hover:bg-blue-600 text-white" title="Voice Call">
+            <Button size="icon" onClick={() => handleStartCall("audio")} className="h-9 w-9 rounded-lg bg-blue-500 hover:bg-blue-600 text-white" title="Voice Call">
               <Phone className="w-4 h-4" />
             </Button>
-            <Button size="icon" onClick={() => startCall("video")} className="h-9 w-9 rounded-lg bg-purple-500 hover:bg-purple-600 text-white" title="Video Call">
+            <Button size="icon" onClick={() => handleStartCall("video")} className="h-9 w-9 rounded-lg bg-purple-500 hover:bg-purple-600 text-white" title="Video Call">
               <Video className="w-4 h-4" />
             </Button>
             <Button size="icon" onClick={() => navigate("/whiteboard")} className="h-9 w-9 rounded-lg bg-cyan-500 hover:bg-cyan-600 text-white" title="Shared Whiteboard">

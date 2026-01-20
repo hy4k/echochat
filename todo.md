@@ -114,3 +114,16 @@
 - [ ] Implement call recording capability (optional)
 - [ ] Test across different browsers (Chrome, Firefox, Safari)
 - [x] Add error handling for network issues
+
+
+## Phase 15: WebRTC Chat Integration
+- [x] Import WebRTCCall component into Chat.tsx
+- [x] Add call state management to Chat component
+- [x] Implement call initiation buttons (voice and video)
+- [x] Handle incoming call notifications
+- [x] Manage call acceptance and rejection
+- [x] Replace existing call UI with WebRTCCall component
+- [ ] Test voice calls between users
+- [ ] Test video calls between users
+- [x] Test call ending and cleanup
+- [ ] Add call history tracking
