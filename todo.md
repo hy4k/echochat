@@ -93,3 +93,24 @@
 - [ ] Implement collaborative cursor indicators
 - [ ] Test whiteboard across browsers
 - [x] Add whiteboard navigation button to chat header
+
+
+## Phase 13: Real-time Drawing Sync
+- [x] Implement Socket.io event broadcasting for drawing strokes
+- [x] Add stroke synchronization between connected users
+- [x] Implement collaborative cursor indicators with user names
+- [x] Add drawing session state management
+- [ ] Test real-time sync across multiple browser windows
+- [x] Add connection status indicator on whiteboard
+
+## Phase 14: WebRTC Voice & Video Calling
+- [x] Implement proper RTCPeerConnection setup with ICE candidates
+- [x] Add signaling via WebSocket for call initiation
+- [x] Implement audio stream capture and transmission
+- [x] Implement video stream capture and transmission
+- [x] Add call state management (ringing, connected, ended)
+- [x] Implement microphone/camera permission handling
+- [x] Add audio/video quality indicators
+- [ ] Implement call recording capability (optional)
+- [ ] Test across different browsers (Chrome, Firefox, Safari)
+- [x] Add error handling for network issues
