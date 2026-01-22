@@ -85,3 +85,39 @@ export const sharedHorizon = pgTable("sharedHorizon", {
 
 export type SharedHorizon = typeof sharedHorizon.$inferSelect;
 export type InsertSharedHorizon = typeof sharedHorizon.$inferInsert;
+
+export const notifications = pgTable("notifications", {
+    id: serial("id").primaryKey(),
+    userId: integer("userId").notNull().references(() => users.id),
+    senderId: integer("senderId").notNull().references(() => users.id),
+    messageId: integer("messageId").references(() => messages.id),
+    offlineMessageId: integer("offlineMessageId").references(() => offlineMessages.id),
+    type: text("type", { enum: ["offline_message", "call_missed", "message_received", "custom"] }).notNull(),
+    title: text("title").notNull(),
+    content: text("content"),
+    read: integer("read").default(0).notNull(),
+    archived: integer("archived").default(0).notNull(),
+    actionUrl: text("actionUrl"),
+    createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+    readAt: timestamp("readAt", { withTimezone: true }),
+});
+
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = typeof notifications.$inferInsert;
+
+export const notificationPreferences = pgTable("notificationPreferences", {
+    id: serial("id").primaryKey(),
+    userId: integer("userId").notNull().unique().references(() => users.id),
+    enableBrowserNotifications: integer("enableBrowserNotifications").default(1).notNull(),
+    enableInAppNotifications: integer("enableInAppNotifications").default(1).notNull(),
+    enableSoundAlerts: integer("enableSoundAlerts").default(1).notNull(),
+    enableVibration: integer("enableVibration").default(1).notNull(),
+    notifyOfflineMessages: integer("notifyOfflineMessages").default(1).notNull(),
+    notifyMissedCalls: integer("notifyMissedCalls").default(1).notNull(),
+    quietHoursStart: varchar("quietHoursStart", { length: 5 }),
+    quietHoursEnd: varchar("quietHoursEnd", { length: 5 }),
+    updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type NotificationPreferences = typeof notificationPreferences.$inferSelect;
+export type InsertNotificationPreferences = typeof notificationPreferences.$inferInsert;

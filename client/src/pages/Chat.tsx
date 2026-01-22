@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
 import WebRTCCall from "@/components/WebRTCCall";
+import NotificationCenter from "@/components/NotificationCenter";
+import { useNotifications } from "@/hooks/useNotifications";
 import {
   LogOut, MessageCircle, Phone, Video, Check, CheckCheck,
   Sparkles, Sun, Heart, Send, Mic, Paperclip, X, RotateCcw, PenTool
@@ -29,6 +31,7 @@ export default function Chat() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const utils = trpc.useUtils();
+  const { notifications, unreadCount, handleMarkAsRead, handleArchive, handleClearAll } = useNotifications();
 
   // Call State
   const [isCalling, setIsCalling] = useState(false);
@@ -626,6 +629,12 @@ export default function Chat() {
           </div>
 
           <div className="flex items-center gap-1">
+            <NotificationCenter
+              notifications={notifications}
+              onMarkAsRead={handleMarkAsRead}
+              onArchive={handleArchive}
+              onClearAll={handleClearAll}
+            />
             <Button size="icon" onClick={() => handleStartCall("audio")} className="h-9 w-9 rounded-lg bg-blue-500 hover:bg-blue-600 text-white" title="Voice Call">
               <Phone className="w-4 h-4" />
             </Button>

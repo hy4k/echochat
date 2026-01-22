@@ -127,3 +127,16 @@
 - [ ] Test video calls between users
 - [x] Test call ending and cleanup
 - [ ] Add call history tracking
+
+
+## Phase 16: Offline Message Notification System
+- [x] Create notification database table with status tracking
+- [x] Implement notification service for offline message detection
+- [x] Add browser notification API integration
+- [x] Create in-app notification toast system
+- [x] Implement notification badges for unread offline messages
+- [x] Add notification sound/vibration alerts
+- [x] Create notification history and archive
+- [x] Implement notification preferences/settings
+- [x] Add notification clearing and dismissal
+- [ ] Test notification delivery across devices

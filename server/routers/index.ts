@@ -144,6 +144,53 @@ export const appRouter = router({
                 return [];
             }),
     }),
+    notifications: router({
+        getUnread: protectedProcedure
+            .query(async ({ ctx }) => {
+                return [];
+            }),
+        markAsRead: protectedProcedure
+            .input(z.object({ id: z.number() }))
+            .mutation(async ({ input, ctx }) => {
+                return { success: true };
+            }),
+        archive: protectedProcedure
+            .input(z.object({ id: z.number() }))
+            .mutation(async ({ input, ctx }) => {
+                return { success: true };
+            }),
+        clearAll: protectedProcedure
+            .mutation(async ({ ctx }) => {
+                return { success: true };
+            }),
+        getPreferences: protectedProcedure
+            .query(async ({ ctx }) => {
+                return {
+                    enableBrowserNotifications: true,
+                    enableInAppNotifications: true,
+                    enableSoundAlerts: true,
+                    enableVibration: true,
+                    notifyOfflineMessages: true,
+                    notifyMissedCalls: true,
+                    quietHoursStart: null,
+                    quietHoursEnd: null,
+                };
+            }),
+        updatePreferences: protectedProcedure
+            .input(z.object({
+                enableBrowserNotifications: z.boolean().optional(),
+                enableInAppNotifications: z.boolean().optional(),
+                enableSoundAlerts: z.boolean().optional(),
+                enableVibration: z.boolean().optional(),
+                notifyOfflineMessages: z.boolean().optional(),
+                notifyMissedCalls: z.boolean().optional(),
+                quietHoursStart: z.string().optional(),
+                quietHoursEnd: z.string().optional(),
+            }))
+            .mutation(async ({ input, ctx }) => {
+                return { success: true };
+            }),
+    }),
 });
 
 export type AppRouter = typeof appRouter;
