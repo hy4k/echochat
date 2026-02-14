@@ -2,7 +2,20 @@ import { router, publicProcedure, protectedProcedure } from "../trpc";
 import { z } from "zod";
 import * as db from "../db";
 
+// Import new learning platform routers
+import { skillsRouter } from "./skills";
+import { matchingRouter } from "./matching";
+import { partnershipsRouter } from "./partnerships";
+import { roomsRouter } from "./rooms";
+import { sessionsRouter } from "./sessions";
+import { achievementsRouter } from "./achievements";
+import { resourcesRouter } from "./resources";
+import { profileRouter } from "./profile";
+import { discoveryRouter } from "./discovery";
+import { subscriptionRouter } from "./subscription";
+
 export const appRouter = router({
+    // Auth router
     auth: router({
         me: publicProcedure.query(async ({ ctx }) => {
             try {
@@ -41,6 +54,7 @@ export const appRouter = router({
             return { success: true };
         }),
     }),
+    // Chat router
     chat: router({
         getMessages: protectedProcedure
             .query(async ({ ctx }) => {
@@ -72,6 +86,7 @@ export const appRouter = router({
                 });
             }),
     }),
+    // Bottle router
     bottle: router({
         sendBottle: protectedProcedure
             .input(z.object({ content: z.string() }))
@@ -99,6 +114,7 @@ export const appRouter = router({
                 return { success: true };
             }),
     }),
+    // Whiteboard router
     whiteboard: router({
         createWhiteboard: protectedProcedure
             .input(z.object({
@@ -144,6 +160,7 @@ export const appRouter = router({
                 return [];
             }),
     }),
+    // Notifications router
     notifications: router({
         getUnread: protectedProcedure
             .query(async ({ ctx }) => {
@@ -191,6 +208,40 @@ export const appRouter = router({
                 return { success: true };
             }),
     }),
+
+    // ==============================================
+    // LEARNING PLATFORM ROUTERS (Phase 3)
+    // ==============================================
+
+    // Skills router - Skill management
+    skills: skillsRouter,
+
+    // Matching router - Matching system
+    matching: matchingRouter,
+
+    // Partnerships router - Learning partnerships
+    partnerships: partnershipsRouter,
+
+    // Rooms router - Learning rooms
+    rooms: roomsRouter,
+
+    // Sessions router - Session scheduling
+    sessions: sessionsRouter,
+
+    // Achievements router - Achievement system
+    achievements: achievementsRouter,
+
+    // Resources router - Resource library
+    resources: resourcesRouter,
+
+    // Profile router - Extended user profiles
+    profile: profileRouter,
+
+    // Discovery router - User discovery
+    discovery: discoveryRouter,
+
+    // Subscription router - Premium subscriptions
+    subscription: subscriptionRouter,
 });
 
 export type AppRouter = typeof appRouter;

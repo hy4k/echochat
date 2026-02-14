@@ -3,10 +3,10 @@
 @import "tw-animate-css";
 
 @theme {
-  --font-sans: 'Outfit', 'Inter', system-ui, sans-serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
   --font-serif: 'Playfair Display', Georgia, serif;
 
-  --color-accent: #c4a484;
+  --color-accent: #b5945c;
   /* Soft Sand/Gold */
   --color-accent-foreground: #2d2a26;
 

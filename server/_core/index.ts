@@ -83,6 +83,9 @@ const PORT = Number(process.env.PORT || 3003);
 
 import { Server } from "socket.io";
 
+import { setupWebSocketHandlers } from "../websocket-handlers";
+
+// Initialize Socket.IO
 const io = new Server(httpServer, {
     cors: {
         origin: "*",
@@ -90,32 +93,8 @@ const io = new Server(httpServer, {
     }
 });
 
-io.on("connection", (socket) => {
-    console.log("User connected:", socket.id);
-
-    socket.on("join-room", (roomId) => {
-        socket.join(roomId);
-        console.log(`User ${socket.id} joined room ${roomId}`);
-        // Notify others in room
-        socket.to(roomId).emit("user-connected", socket.id);
-    });
-
-    socket.on("offer", (payload) => {
-        socket.to(payload.roomId).emit("offer", payload);
-    });
-
-    socket.on("answer", (payload) => {
-        socket.to(payload.roomId).emit("answer", payload);
-    });
-
-    socket.on("ice-candidate", (payload) => {
-        socket.to(payload.roomId).emit("ice-candidate", payload);
-    });
-
-    socket.on("disconnect", () => {
-        console.log("User disconnected:", socket.id);
-    });
-});
+// Setup all WebSocket handlers
+setupWebSocketHandlers(io);
 
 httpServer.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);

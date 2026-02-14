@@ -7,6 +7,17 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import Landing from "./pages/Landing";
 import Chat from "./pages/Chat";
 import Whiteboard from "./pages/Whiteboard";
+import Profile from "./pages/Profile";
+import Discover from "./pages/Discover";
+import Matching from "./pages/Matching";
+import Partnerships from "./pages/Partnerships";
+import LearningRooms from "./pages/LearningRooms";
+import Sessions from "./pages/Sessions";
+import Resources from "./pages/Resources";
+import Achievements from "./pages/Achievements";
+import Subscription from "./pages/Subscription";
+import HomeRedesign from "./pages/HomeRedesign";
+import DashboardLayout from "./components/DashboardLayout";
 import { useAuth } from "./_core/hooks/useAuth";
 
 function Router() {
@@ -26,13 +37,40 @@ function Router() {
   return (
     <Switch>
       <Route path="/">
-        {isAuthenticated ? <Chat /> : <Landing />}
+        {isAuthenticated ? <DashboardLayout><HomeRedesign /></DashboardLayout> : <Landing />}
       </Route>
       <Route path="/chat">
         {isAuthenticated ? <Chat /> : <Landing />}
       </Route>
       <Route path="/whiteboard">
         {isAuthenticated ? <Whiteboard /> : <Landing />}
+      </Route>
+      <Route path="/profile">
+        {isAuthenticated ? <DashboardLayout><Profile /></DashboardLayout> : <Landing />}
+      </Route>
+      <Route path="/discover">
+        {isAuthenticated ? <DashboardLayout><Discover /></DashboardLayout> : <Landing />}
+      </Route>
+      <Route path="/matching">
+        {isAuthenticated ? <DashboardLayout><Matching /></DashboardLayout> : <Landing />}
+      </Route>
+      <Route path="/partnerships">
+        {isAuthenticated ? <DashboardLayout><Partnerships /></DashboardLayout> : <Landing />}
+      </Route>
+      <Route path="/rooms">
+        {isAuthenticated ? <DashboardLayout><LearningRooms /></DashboardLayout> : <Landing />}
+      </Route>
+      <Route path="/sessions">
+        {isAuthenticated ? <DashboardLayout><Sessions /></DashboardLayout> : <Landing />}
+      </Route>
+      <Route path="/resources">
+        {isAuthenticated ? <DashboardLayout><Resources /></DashboardLayout> : <Landing />}
+      </Route>
+      <Route path="/achievements">
+        {isAuthenticated ? <DashboardLayout><Achievements /></DashboardLayout> : <Landing />}
+      </Route>
+      <Route path="/subscription">
+        {isAuthenticated ? <DashboardLayout><Subscription /></DashboardLayout> : <Landing />}
       </Route>
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
